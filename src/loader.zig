@@ -77,9 +77,10 @@ pub const Loader = struct {
             // The rest will use a randomly selected non-renewable resource.
             // No renewables should appear in the first 12 generators,
             // and uranium should not appear in the first 10 generators.
+            // Generator 13 should use a renewable resource.
             const use_renewable = r.random.uintLessThan(u8, 10);
             var assign_resource: ?Resource = null;
-            if (use_renewable >= 8 and gen_ix > 13) {
+            if (use_renewable >= 8 and gen_ix > 13 or gen_ix == 13) {
                 assign_resource = renewables[r.random.uintLessThan(u8, renewables.len)];
                 resource_count = 1;
             } else {

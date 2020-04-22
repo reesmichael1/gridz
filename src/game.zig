@@ -19,17 +19,23 @@ const GameStage = enum {
 ///     2. the future generator market
 ///     3. the generators remaining in the stack, not yet revealed
 /// The initial list gens MUST be sorted by generator index.
-fn splitGenerators(gens: []Generator) [3][]Generator {
+fn splitGenerators(allocator: *Allocator, gens: []Generator) ![3][]Generator {
     const seed = std.time.milliTimestamp();
     var r = std.rand.DefaultPrng.init(seed);
 
-    var hidden = gens[8..];
+    var eco = gens[10];
+
+    var hidden_a = gens[8..10];
+    var hidden_b = gens[11..];
+    var hidden = try std.mem.concat(allocator, Generator, &[_][]Generator{ hidden_a, hidden_b });
     r.random.shuffle(Generator, hidden);
+
+    var gen_stack = try std.mem.concat(allocator, Generator, &[_][]Generator{ &[_]Generator{eco}, hidden });
 
     return [3][]Generator{
         gens[0..4],
         gens[4..8],
-        hidden,
+        gen_stack,
     };
 }
 
@@ -55,7 +61,7 @@ pub const Game = struct {
         const loader = Loader.init(allocator);
 
         const generators = try loader.loadGenerators();
-        const split = splitGenerators(generators);
+        const split = try splitGenerators(allocator, generators);
 
         return Game{
             .grid = loader.loadGrid(),
