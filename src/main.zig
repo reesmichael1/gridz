@@ -7,5 +7,5 @@ pub fn main() anyerror!void {
     defer arena.deinit();
 
     const allocator = &arena.allocator;
-    var game = Game.init(allocator);
+    var game = try Game.init(allocator);
 }

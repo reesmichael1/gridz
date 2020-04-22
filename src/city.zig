@@ -11,4 +11,8 @@ pub const City = struct {
     secondPlayer: ?Player = null,
     /// The third (if any) player to settle in the City
     thirdPlayer: ?Player = null,
+
+    pub fn init(name: []const u8) City {
+        return City{ .name = name };
+    }
 };
