@@ -8,32 +8,45 @@ const Market = @import("resource_market.zig").Market;
 const Player = @import("player.zig").Player;
 const Resource = @import("resource.zig").Resource;
 
-fn buildAdjacencyMatrix(cities: []City) [][]u8 {
+fn buildAdjacencyMatrix(allocator: *Allocator, cities: []City) ![][]u8 {
     // Eventually, this will be generated from the list of cities,
     // but for now, let's hardcode it.
     // This matrix corresponds to the layout in maps/default.graphml.
-    return &[_][]u8{
-        &[_]u8{ 0, 7, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-        &[_]u8{ 7, 0, 4, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-        &[_]u8{ 0, 4, 0, 5, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-        &[_]u8{ 0, 0, 5, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-        &[_]u8{ 5, 7, 0, 0, 0, 5, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-        &[_]u8{ 0, 0, 0, 0, 5, 0, 8, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-        &[_]u8{ 0, 0, 3, 0, 0, 8, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-        &[_]u8{ 0, 0, 0, 0, 0, 0, 2, 0, 9, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0 },
-        &[_]u8{ 0, 0, 0, 6, 0, 0, 0, 9, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0 },
-        &[_]u8{ 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 3, 0, 0, 4, 0, 0, 0, 0, 0, 0 },
-        &[_]u8{ 0, 0, 0, 0, 0, 3, 0, 0, 0, 3, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0 },
-        &[_]u8{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 0, 10, 0, 8, 2, 0, 0, 0, 0 },
-        &[_]u8{ 0, 0, 0, 0, 0, 0, 0, 3, 7, 0, 0, 10, 0, 0, 0, 9, 5, 0, 0, 0 },
-        &[_]u8{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 6, 0, 0, 8, 0, 0 },
-        &[_]u8{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 7, 7, 0 },
-        &[_]u8{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 9, 0, 0, 0, 8, 0, 5, 11 },
-        &[_]u8{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 8, 0, 0, 0, 6 },
-        &[_]u8{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 7, 0, 0, 0, 0, 0 },
-        &[_]u8{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 5, 0, 0, 0, 8 },
-        &[_]u8{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 6, 0, 8, 0 },
+    const arrays = [20][20]u8{
+        .{ 0, 7, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+        .{ 7, 0, 4, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+        .{ 0, 4, 0, 5, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+        .{ 0, 0, 5, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+        .{ 5, 7, 0, 0, 0, 5, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+        .{ 0, 0, 0, 0, 5, 0, 8, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+        .{ 0, 0, 3, 0, 0, 8, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+        .{ 0, 0, 0, 0, 0, 0, 2, 0, 9, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0 },
+        .{ 0, 0, 0, 6, 0, 0, 0, 9, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0 },
+        .{ 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 3, 0, 0, 4, 0, 0, 0, 0, 0, 0 },
+        .{ 0, 0, 0, 0, 0, 3, 0, 0, 0, 3, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0 },
+        .{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 0, 10, 0, 8, 2, 0, 0, 0, 0 },
+        .{ 0, 0, 0, 0, 0, 0, 0, 3, 7, 0, 0, 10, 0, 0, 0, 9, 5, 0, 0, 0 },
+        .{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 6, 0, 0, 8, 0, 0 },
+        .{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 7, 7, 0 },
+        .{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 9, 0, 0, 0, 8, 0, 5, 11 },
+        .{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 8, 0, 0, 0, 6 },
+        .{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 7, 0, 0, 0, 0, 0 },
+        .{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 5, 0, 0, 0, 8 },
+        .{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 6, 0, 8, 0 },
     };
+
+    var grid = std.ArrayList([]u8).init(allocator);
+
+    for (arrays) |row| {
+        var rowList = std.ArrayList(u8).init(allocator);
+
+        for (row) |col| {
+            try rowList.append(col);
+        }
+        try grid.append(rowList.items);
+    }
+
+    return grid.items;
 }
 
 /// The Loader handles loading the initial game state.
@@ -111,11 +124,11 @@ pub const Loader = struct {
             }
         }
 
-        return generators.toSlice();
+        return generators.items;
     }
 
-    pub fn loadGrid(self: Loader) Grid {
-        return Grid.init(self.allocator, self);
+    pub fn loadGrid(self: Loader) !Grid {
+        return try Grid.init(self.allocator, self);
     }
 
     pub fn loadCities(self: Loader) []City {
@@ -143,8 +156,8 @@ pub const Loader = struct {
         };
     }
 
-    pub fn loadConnections(self: Loader, cities: []City) [][]u8 {
-        return buildAdjacencyMatrix(cities);
+    pub fn loadConnections(self: Loader, cities: []City) ![][]u8 {
+        return try buildAdjacencyMatrix(self.allocator, cities);
     }
 
     pub fn loadPlayers(self: Loader) []Player {

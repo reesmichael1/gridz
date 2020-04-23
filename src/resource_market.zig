@@ -95,6 +95,6 @@ pub const Market = struct {
             });
         }
 
-        return Market{ .blocks = blocks.toSlice() };
+        return Market{ .blocks = blocks.items };
     }
 };

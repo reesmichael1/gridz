@@ -11,9 +11,9 @@ pub const Grid = struct {
     /// An adjacency matrix of the connections between Cities
     connections: [][]u8,
 
-    pub fn init(allocator: *Allocator, loader: Loader) Grid {
+    pub fn init(allocator: *Allocator, loader: Loader) !Grid {
         const cities = loader.loadCities();
-        const connections = loader.loadConnections(cities);
+        const connections = try loader.loadConnections(cities);
 
         return Grid{
             .cities = cities,

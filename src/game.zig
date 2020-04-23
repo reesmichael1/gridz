@@ -64,7 +64,7 @@ pub const Game = struct {
         const split = try splitGenerators(allocator, generators);
 
         return Game{
-            .grid = loader.loadGrid(),
+            .grid = try loader.loadGrid(),
             .players = loader.loadPlayers(),
             .gen_market = split[0],
             .future_gens = split[1],
