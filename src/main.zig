@@ -9,19 +9,7 @@ pub fn main() anyerror!void {
     const allocator = &arena.allocator;
     var game = try Game.init(allocator);
 
-    for (game.gen_market) |gen| {
-        std.debug.warn("market: {}\n", .{gen});
-    }
-
-    std.debug.warn("\n", .{});
-
-    for (game.future_gens) |gen| {
-        std.debug.warn("future market: {}\n", .{gen});
-    }
-
-    std.debug.warn("\n", .{});
-
-    for (game.hidden_generators) |gen| {
-        std.debug.warn("hidden generator: {}\n", .{gen});
+    while (!game.has_ended) {
+        try game.nextTurn();
     }
 }

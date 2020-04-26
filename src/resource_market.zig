@@ -29,7 +29,6 @@ pub const Market = struct {
     blocks: []Block,
 
     pub fn init(allocator: *Allocator) !Market {
-        // const blocks = &[_]Block{};
         var blocks = std.ArrayList(Block).init(allocator);
 
         var cost: u8 = 1;

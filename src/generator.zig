@@ -26,3 +26,9 @@ pub const Generator = struct {
         };
     }
 };
+
+/// Return true if gen1 has a lower index than gen2, false otherwise.
+/// Useful for sorting slices of generators by index.
+pub fn genComp(gen1: Generator, gen2: Generator) bool {
+    return gen1.index < gen2.index;
+}

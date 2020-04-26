@@ -12,7 +12,7 @@ pub const Grid = struct {
     connections: [][]u8,
 
     pub fn init(allocator: *Allocator, loader: Loader) !Grid {
-        const cities = loader.loadCities();
+        const cities = try loader.loadCities();
         const connections = try loader.loadConnections(cities);
 
         return Grid{

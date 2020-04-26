@@ -131,8 +131,8 @@ pub const Loader = struct {
         return try Grid.init(self.allocator, self);
     }
 
-    pub fn loadCities(self: Loader) []City {
-        return &[_]City{
+    pub fn loadCities(self: Loader) ![]City {
+        const cities = [_]City{
             City.init("Ashworth"),
             City.init("Transton"),
             City.init("Greenwich"),
@@ -154,18 +154,34 @@ pub const Loader = struct {
             City.init("Waterfield"),
             City.init("Starfolk"),
         };
+
+        var cities_list = std.ArrayList(City).init(self.allocator);
+        for (cities) |city| {
+            try cities_list.append(city);
+        }
+
+        return cities_list.items;
     }
 
     pub fn loadConnections(self: Loader, cities: []City) ![][]u8 {
         return try buildAdjacencyMatrix(self.allocator, cities);
     }
 
-    pub fn loadPlayers(self: Loader) []Player {
-        return &[_]Player{
+    pub fn loadPlayers(self: Loader) ![]Player {
+        // TODO: assert that each player has a unique name.
+        var players = [_]Player{
             Player.init("Alice"),
             Player.init("Bob"),
             Player.init("Charlie"),
         };
+
+        var players_list = std.ArrayList(Player).init(self.allocator);
+
+        for (players) |player| {
+            try players_list.append(player);
+        }
+
+        return players_list.items;
     }
 
     pub fn loadResourceMarket(self: Loader) !Market {
