@@ -3,6 +3,7 @@ const Allocator = std.mem.Allocator;
 
 const auction = @import("auction.zig");
 const gen_mod = @import("generator.zig");
+const player_mod = @import("player.zig");
 const input = @import("input.zig");
 
 const Block = @import("resource_market.zig").Block;
@@ -10,7 +11,7 @@ const Generator = gen_mod.Generator;
 const Grid = @import("grid.zig").Grid;
 const Loader = @import("loader.zig").Loader;
 const Market = @import("resource_market.zig").Market;
-const Player = @import("player.zig").Player;
+const Player = player_mod.Player;
 
 const GameStage = enum {
     Stage1,
@@ -86,7 +87,6 @@ pub const Game = struct {
         const generators = try loader.loadGenerators();
         const split = try splitGenerators(allocator, generators, &rng);
 
-        // Randomly decide the turn order for the first turn
         var players = try loader.loadPlayers();
 
         return Game{
@@ -105,12 +105,17 @@ pub const Game = struct {
 
     /// Run a turn of the game.
     pub fn nextTurn(self: *Game) !void {
-        std.debug.assert(self.players.len == 3);
-
-        self.phase1();
+        self.phase1(self.round == 1);
         try self.updateDisplay();
         try self.phase2();
 
+        if (self.round == 1) {
+            // In the first round, after choosing generators, set the turn order
+            // based off of the new generators.
+            self.phase1(false);
+        }
+
+        try self.updateDisplay();
         self.has_ended = true;
     }
 
@@ -155,13 +160,15 @@ pub const Game = struct {
     }
 
     /// Determine player order for this turn.
-    fn phase1(self: *Game) void {
+    fn phase1(self: *Game, random: bool) void {
         // For the first round, player order is randomly determined.
         // For the remaining turns, players are ordered by number of
         // cities selected, with ties broken by the highest numbered generator.
-        if (self.round == 1) {
+        if (random) {
             self.rng.random.shuffle(Player, self.players);
-        } else unreachable; // TODO implement player order for later rounds
+        } else {
+            std.sort.sort(Player, self.players, player_mod.playerComp);
+        }
     }
 
     /// Run a generator auction.
@@ -183,7 +190,8 @@ pub const Game = struct {
                     // Remove the player who bought a generator
                     // from the list of players eligible to buy a generator.
                     to_remove = purchase.buyer;
-                    purchase.buyer.money -= purchase.cost;
+
+                    try purchase.buyer.buyGenerator(self.allocator, purchase.gen, purchase.cost);
 
                     // Update the generator markets by removing the purchased generator,
                     // replacing it with a generator from the stack,
