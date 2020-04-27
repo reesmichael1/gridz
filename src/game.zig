@@ -113,9 +113,9 @@ pub const Game = struct {
             // In the first round, after choosing generators, set the turn order
             // based off of the new generators.
             self.phase1(false);
+            try self.updateDisplay();
         }
 
-        try self.updateDisplay();
         self.has_ended = true;
     }
 
