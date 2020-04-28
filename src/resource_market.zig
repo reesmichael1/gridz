@@ -44,7 +44,7 @@ pub const Market = struct {
                 garbage_count = 3;
             }
 
-            const resources = &[_]ResourceBlock{
+            const resources = [4]ResourceBlock{
                 ResourceBlock{
                     .resource = Resource.Coal,
                     .count_available = 3,
@@ -67,9 +67,14 @@ pub const Market = struct {
                 },
             };
 
+            var resource_blocks = std.ArrayList(ResourceBlock).init(allocator);
+            for (resources) |block| {
+                try resource_blocks.append(block);
+            }
+
             try blocks.append(Block{
                 .cost = cost,
-                .resources = resources,
+                .resources = resource_blocks.items,
             });
         }
 
@@ -87,10 +92,14 @@ pub const Market = struct {
                     .count_filled = uranium_count,
                 },
             };
+            var resource_blocks = std.ArrayList(ResourceBlock).init(allocator);
+            for (resources) |block| {
+                try resource_blocks.append(block);
+            }
 
             try blocks.append(Block{
                 .cost = cost,
-                .resources = resources,
+                .resources = resource_blocks.items,
             });
         }
 

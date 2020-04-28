@@ -116,6 +116,8 @@ pub const Game = struct {
             try self.updateDisplay();
         }
 
+        try self.phase3();
+
         self.has_ended = true;
     }
 
@@ -131,6 +133,7 @@ pub const Game = struct {
         try self.displayGenerators();
     }
 
+    /// Display the generators in the current and future markets.
     fn displayGenerators(self: Game) !void {
         const stdout = std.io.getStdOut().outStream();
         try stdout.print("\n\nGenerators available:\n", .{});
@@ -157,6 +160,25 @@ pub const Game = struct {
         }
 
         try stdout.print("\n\n", .{});
+    }
+
+    /// Display the resources available for the players to purchase.
+    fn displayResourceMarket(self: Game) !void {
+        const stdout = std.io.getStdOut().outStream();
+
+        for (self.resource_market.blocks) |block| {
+            try stdout.print("Resources available for {} GZD\n\n", .{block.cost});
+
+            for (block.resources) |resource| {
+                try stdout.print("{}: {}/{}\n", .{
+                    resource.resource,
+                    resource.count_filled,
+                    resource.count_available,
+                });
+            }
+
+            try stdout.print("\n", .{});
+        }
     }
 
     /// Determine player order for this turn.
@@ -260,6 +282,11 @@ pub const Game = struct {
             try self.updateGenMarket(new_market.items);
             try self.displayGenerators();
         }
+    }
+
+    /// Allow the players to buy resources for their generators.
+    fn phase3(self: *Game) !void {
+        try self.displayResourceMarket();
     }
 
     /// Assign generators into current and future markets in the correct order.
