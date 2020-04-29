@@ -287,6 +287,66 @@ pub const Game = struct {
     /// Allow the players to buy resources for their generators.
     fn phase3(self: *Game) !void {
         try self.displayResourceMarket();
+
+        var player_ix: usize = self.players.len - 1;
+
+        while (player_ix >= 0) : (player_ix -= 1) {
+            try self.buyResources(&self.players[player_ix]);
+            try self.displayResourceMarket();
+
+            if (player_ix == 0) {
+                break;
+            }
+        }
+    }
+
+    fn buyResources(self: *Game, player: *Player) !void {
+        const stdout = std.io.getStdOut().outStream();
+        const can_store = try player.getStoreableResources(self.allocator);
+
+        try stdout.print("Buying resources for {}\n", .{player.name});
+
+        var it = can_store.iterator();
+        while (it.next()) |resource| {
+            var to_buy: u8 = 0;
+            var cost: u64 = 0;
+            while (true) {
+                to_buy = try input.getNumberFromUser(u8, "You can store up to {} {}. How many would you like to buy? ", .{
+                    resource.value,
+                    resource.key,
+                });
+
+                if (to_buy == 0) {
+                    try stdout.print("Please enter a non-zero number.\n", .{});
+                    continue;
+                }
+
+                if (to_buy > resource.value) {
+                    try stdout.print("You can store at most {} {}.\n", .{
+                        resource.value,
+                        resource.key,
+                    });
+                    continue;
+                }
+
+                cost = self.resource_market.costOfResources(resource.key, to_buy) catch |err| {
+                    try stdout.print("The market doesn't have that many resources available.\n", .{});
+                    continue;
+                };
+
+                if (cost > player.money) {
+                    try stdout.print("You can't afford to buy that many {}.\n", .{resource.key});
+                    continue;
+                }
+
+                break;
+            }
+
+            self.resource_market.buyResource(resource.key, to_buy);
+            player.money -= cost;
+        }
+
+        try stdout.print("\n", .{});
     }
 
     /// Assign generators into current and future markets in the correct order.
