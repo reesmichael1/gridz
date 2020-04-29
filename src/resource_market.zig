@@ -1,5 +1,8 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const testing = std.testing;
+
+pub const MarketError = error{NotEnoughResources};
 
 const Resource = @import("resource.zig").Resource;
 
@@ -105,4 +108,94 @@ pub const Market = struct {
 
         return Market{ .blocks = blocks.items };
     }
+
+    /// Buy a number of a resource from the market.
+    pub fn buyResource(self: *Market, resource: Resource, count: u8) void {
+        var remaining: u8 = count;
+
+        for (self.blocks) |block| {
+            for (block.resources) |*r| {
+                if (r.resource == resource) {
+                    if (r.count_filled >= remaining) {
+                        r.count_filled -= remaining;
+                        remaining = 0;
+                        return;
+                    } else {
+                        remaining -= r.count_filled;
+                        r.count_filled = 0;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Calculate the cost of buying a number of a resource from the market.
+    /// Returns an error if there are not enough resources in the market
+    /// to buy the specified count.
+    pub fn costOfResources(self: Market, resource: Resource, count: u8) !u64 {
+        var cost: u64 = 0;
+        var remaining: u8 = count;
+
+        for (self.blocks) |block| {
+            for (block.resources) |*r| {
+                if (r.resource == resource) {
+                    if (r.count_filled >= remaining) {
+                        cost += block.cost * remaining;
+                        remaining = 0;
+                        return cost;
+                    } else {
+                        remaining -= r.count_filled;
+                        cost += block.cost * r.count_filled;
+                    }
+                }
+            }
+        }
+
+        return error.NotEnoughResources;
+    }
 };
+
+test "buying coal from first block" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+
+    var market = try Market.init(&arena.allocator);
+
+    std.testing.expectEqual(@as(u64, 2), try market.costOfResources(Resource.Coal, 2));
+
+    market.buyResource(Resource.Coal, 2);
+    std.testing.expectEqual(@as(u64, 1), market.blocks[0].resources[0].count_filled);
+}
+
+test "buying coal across two blocks" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+
+    var market = try Market.init(&arena.allocator);
+    const expected_cost: u64 = 5;
+    std.testing.expectEqual(expected_cost, try market.costOfResources(Resource.Coal, 4));
+
+    market.buyResource(Resource.Coal, 4);
+    std.testing.expectEqual(@as(u64, 0), market.blocks[0].resources[0].count_filled);
+    std.testing.expectEqual(@as(u64, 2), market.blocks[1].resources[0].count_filled);
+}
+
+test "buying oil from first available block" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+
+    var market = try Market.init(&arena.allocator);
+    const expected_cost: u64 = 3;
+    std.testing.expectEqual(expected_cost, try market.costOfResources(Resource.Oil, 1));
+
+    market.buyResource(Resource.Oil, 1);
+    std.testing.expectEqual(@as(u64, 2), market.blocks[2].resources[1].count_filled);
+}
+
+test "buying too many resources from the market fails" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+
+    var market = try Market.init(&arena.allocator);
+    std.testing.expectError(error.NotEnoughResources, market.costOfResources(Resource.Coal, 100));
+}
