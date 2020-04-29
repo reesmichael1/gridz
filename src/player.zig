@@ -49,6 +49,18 @@ pub const Player = struct {
 
         std.sort.sort(Generator, self.generators, gen_mod.genComp);
     }
+
+    /// Return a hash map of each resource the player can store -> how many can be stored.
+    pub fn getStoreableResources(self: *const Player, allocator: *Allocator) !std.AutoHashMap(Resource, u8) {
+        var map = std.AutoHashMap(Resource, u8).init(allocator);
+
+        for (self.generators) |generator| {
+            const current = try map.getOrPutValue(generator.resource, 0);
+            _ = try map.put(generator.resource, current.value + 2 * generator.resource_count);
+        }
+
+        return map;
+    }
 };
 
 /// Compare players to determine turn order.
@@ -139,4 +151,50 @@ test "turn order entirely on generators" {
     std.sort.sort(Player, players, playerComp);
 
     testing.expectEqualSlices(Player, players, &[_]Player{ playerFirst, playerSecond, playerThird });
+}
+
+test "player can store single resource" {
+    const playerWithCoal = Player{
+        .name = "coal",
+        .generators = &[_]Generator{Generator.init(10, 1, 2, Resource.Coal)},
+        .cities = &[_]City{},
+    };
+
+    const can_store = try playerWithCoal.getStoreableResources(std.testing.allocator);
+    defer can_store.deinit();
+
+    testing.expect(can_store.getValue(Resource.Coal).? == 4);
+}
+
+test "player can store multiple resources" {
+    const playerWithCoalAndOil = Player{
+        .name = "coal and oil",
+        .generators = &[_]Generator{
+            Generator.init(10, 1, 2, Resource.Coal),
+            Generator.init(20, 1, 3, Resource.Oil),
+        },
+        .cities = &[_]City{},
+    };
+
+    const can_store = try playerWithCoalAndOil.getStoreableResources(std.testing.allocator);
+    defer can_store.deinit();
+
+    testing.expect(can_store.getValue(Resource.Coal).? == 4);
+    testing.expect(can_store.getValue(Resource.Oil).? == 6);
+}
+
+test "player can store same resource across multiple generators" {
+    const playerWithTwoCoal = Player{
+        .name = "two coal generators",
+        .generators = &[_]Generator{
+            Generator.init(10, 1, 2, Resource.Coal),
+            Generator.init(20, 1, 3, Resource.Coal),
+        },
+        .cities = &[_]City{},
+    };
+
+    const can_store = try playerWithTwoCoal.getStoreableResources(std.testing.allocator);
+    defer can_store.deinit();
+
+    testing.expect(can_store.getValue(Resource.Coal).? == 10);
 }
