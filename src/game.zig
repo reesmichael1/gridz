@@ -53,6 +53,12 @@ fn splitGenerators(allocator: *Allocator, gens: []Generator, r: *std.rand.Xorosh
     };
 }
 
+/// Print an integer into a row of the buffer, starting at an x coordinate.
+fn printNumberAtCoord(buf: []u8, num: u8, x: u64) void {
+    const digits = @floatToInt(u8, @floor(@log10(@intToFloat(f32, num)))) + 1;
+    _ = std.fmt.formatIntBuf(buf[x .. x + digits], num, 10, false, std.fmt.FormatOptions{});
+}
+
 /// A Game is the main object for the game and its state.
 /// It holds the board, the players, the generator markets, etc.
 pub const Game = struct {
@@ -130,7 +136,139 @@ pub const Game = struct {
             try stdout.print("{}: {}\n", .{ ix + 1, player.name });
         }
 
+        try self.displayMap();
         try self.displayGenerators();
+    }
+
+    /// Display the cities, their connections, and where players have built.
+    fn displayMap(self: Game) !void {
+        // 17 rows by 120 columns:
+        //      - 4 rows of cities followed by three blank lines
+        //      - Bottom row of cities with no blanks below
+        //      - 30 columns for each of the 4 columns of cities
+        const padding_x = 25;
+        const padding_y = 4;
+        const col_offset = 4;
+        const diag_offset = 2;
+        var buf: [4 * padding_y + 1][4 * padding_x]u8 = undefined;
+
+        // Initialize the buffer to spaces
+        for (buf) |*row| {
+            for (row) |_, ix| {
+                row[ix] = ' ';
+            }
+        }
+
+        const stdout = std.io.getStdOut().outStream();
+        try stdout.print("\n\n", .{});
+
+        for (self.grid.cities) |city| {
+            const start_x = city.x * padding_x;
+            const start_y = city.y * padding_y;
+
+            for (city.name) |ch, ix| {
+                buf[start_y][start_x + ix] = ch;
+            }
+
+            const connections = try self.grid.getConnections(self.allocator, city);
+            for (connections) |connection| {
+                const weight = self.grid.getWeight(city, connection) orelse unreachable;
+                // Draw horizontal bars between horizontal connections
+                if (connection.x == city.x + 1 and connection.y == city.y) {
+                    var x = start_x + city.name.len;
+                    while (@mod(x, padding_x) != 0) : (x += 1) {
+                        buf[start_y][x] = '-';
+                    }
+
+                    const weight_ix = start_x + city.name.len + (padding_x - city.name.len) / 2;
+                    printNumberAtCoord(buf[start_y][0..], weight, weight_ix);
+                } else if (connection.x == city.x and connection.y == city.y + 1) {
+                    // Draw vertical bars between vertical connections
+                    var y = start_y + 1;
+                    while (@mod(y, padding_y) != 0) : (y += 1) {
+                        if (@mod(y, padding_y) == padding_y / 2) {
+                            printNumberAtCoord(buf[y][0..], weight, start_x + col_offset);
+                        } else {
+                            buf[y][start_x + col_offset] = '|';
+                        }
+                    }
+                } else if (connection.x > city.x and connection.y > city.y) {
+                    // Connections below and to the right
+                    var y = start_y + 1;
+                    var x = start_x + col_offset + diag_offset;
+                    const height_needed = (connection.y - city.y) * padding_y;
+                    const breakpoint = height_needed / 2;
+
+                    var lines_needed: u8 = 0;
+
+                    while (y - start_y < breakpoint) {
+                        buf[y][x] = '\\';
+                        y += 1;
+                        x += 1;
+                        lines_needed += 1;
+                    }
+
+                    const delta_x = connection.x - city.x;
+                    const rows_needed = delta_x * padding_x - 2 * lines_needed - col_offset * delta_x;
+                    const weight_ix = start_x + col_offset + diag_offset + rows_needed / 2;
+                    var rows_printed: u8 = 0;
+
+                    while (rows_printed <= rows_needed) : (rows_printed += 1) {
+                        buf[y][x] = '-';
+                        x += 1;
+                    }
+
+                    printNumberAtCoord(buf[y][0..], weight, weight_ix);
+                    var lines_printed: u8 = 1;
+                    y += 1;
+
+                    while (lines_printed <= lines_needed) : (lines_printed += 1) {
+                        buf[y][x] = '\\';
+                        y += 1;
+                        x += 1;
+                    }
+                } else if (city.x > 0 and connection.x == city.x - 1 and connection.y > city.y) {
+                    // Connections below and to the left
+                    var y = start_y + 1;
+                    var x = start_x + col_offset - diag_offset;
+                    const height_needed = (connection.y - city.y) * padding_y;
+                    const breakpoint = height_needed / 2;
+
+                    var lines_needed: u8 = 0;
+
+                    while (y - start_y < breakpoint) {
+                        buf[y][x] = '/';
+                        y += 1;
+                        x -= 1;
+                        lines_needed += 1;
+                    }
+
+                    const delta_x = city.x - connection.x;
+                    const rows_needed = delta_x * padding_x - 2 * lines_needed - col_offset * delta_x;
+                    const weight_ix = start_x - rows_needed / 2;
+                    var rows_printed: u8 = 0;
+
+                    while (rows_printed <= rows_needed) : (rows_printed += 1) {
+                        buf[y][x] = '-';
+                        x -= 1;
+                    }
+
+                    printNumberAtCoord(buf[y][0..], weight, weight_ix);
+                    var lines_printed: u8 = 1;
+                    y += 1;
+
+                    while (lines_printed <= lines_needed) : (lines_printed += 1) {
+                        buf[y][x] = '/';
+                        y += 1;
+                        x -= 1;
+                    }
+                }
+            }
+        }
+
+        for (buf) |row| {
+            try stdout.print("{}\n", .{row});
+        }
     }
 
     /// Display the generators in the current and future markets.
