@@ -22,6 +22,8 @@ pub const Grid = struct {
         };
     }
 
+    /// If a City exists at the given coordinates, return it.
+    /// Otherwise, return null;
     pub fn cityAtCoords(self: Grid, x: u8, y: u8) ?City {
         for (self.cities) |city| {
             if (city.x == x and city.y == y) {
@@ -32,6 +34,7 @@ pub const Grid = struct {
         return null;
     }
 
+    /// Return a slice of all of the Cities that are connected to the given city.
     pub fn getConnections(self: Grid, allocator: *Allocator, city: City) ![]City {
         var maybe_ix: ?usize = null;
         for (self.cities) |c, index| {
@@ -53,6 +56,29 @@ pub const Grid = struct {
         }
 
         return connections.items;
+    }
+
+    // TODO: change getConnections to return a slice of tuples of weights/cities.
+    /// If two Cities are connected, then return the weight of the connection.
+    /// Otherwise, return null.
+    pub fn getWeight(self: Grid, city1: City, city2: City) ?u8 {
+        var ix1: usize = undefined;
+        var ix2: usize = undefined;
+        for (self.cities) |city, index| {
+            if (city.eq(city1)) {
+                ix1 = index;
+            } else if (city.eq(city2)) {
+                ix2 = index;
+            }
+        }
+
+        const weight = self.connections[ix1][ix2];
+
+        if (weight == 0) {
+            return null;
+        }
+
+        return weight;
     }
 };
 
@@ -142,4 +168,14 @@ test "calculating connections between cities" {
     testing.expectEqualSlices(City, e_connections, one_connection);
     testing.expectEqualSlices(City, a_connections, two_connections);
     testing.expectEqualSlices(City, b_connections, three_connections);
+}
+
+test "calculating connection weight" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+
+    const grid = try loadTestGrid(&arena.allocator);
+
+    testing.expectEqual(@as(u8, 5), grid.getWeight(grid.cities[0], grid.cities[1]).?);
+    testing.expectEqual(@as(u8, 3), grid.getWeight(grid.cities[1], grid.cities[3]).?);
 }
