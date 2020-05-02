@@ -82,19 +82,19 @@ test "determine turn order" {
     const playerFirst = Player{
         .name = "first on cities",
         .generators = &[_]Generator{Generator.init(3, 1, 1, Resource.Oil)},
-        .cities = &[_]City{ City.init("ABC"), City.init("DEF") },
+        .cities = &[_]City{ City.init("ABC", 0, 1), City.init("DEF", 0, 2) },
     };
 
     const playerSecond = Player{
         .name = "second on generators",
         .generators = &[_]Generator{Generator.init(8, 1, 1, Resource.Oil)},
-        .cities = &[_]City{City.init("ABC")},
+        .cities = &[_]City{City.init("ABC", 0, 1)},
     };
 
     const playerThird = Player{
         .name = "third on generators",
         .generators = &[_]Generator{Generator.init(5, 1, 1, Resource.Oil)},
-        .cities = &[_]City{City.init("DEF")},
+        .cities = &[_]City{City.init("DEF", 0, 2)},
     };
 
     var players = &[_]Player{ playerSecond, playerThird, playerFirst };
@@ -107,19 +107,19 @@ test "turn order entirely on cities" {
     const playerFirst = Player{
         .name = "first",
         .generators = &[_]Generator{Generator.init(3, 1, 1, Resource.Oil)},
-        .cities = &[_]City{ City.init("ABC"), City.init("DEF"), City.init("GHI") },
+        .cities = &[_]City{ City.init("ABC", 0, 0), City.init("DEF", 0, 1), City.init("GHI", 0, 2) },
     };
 
     const playerSecond = Player{
         .name = "second",
         .generators = &[_]Generator{Generator.init(8, 1, 1, Resource.Oil)},
-        .cities = &[_]City{ City.init("ABC"), City.init("DEF") },
+        .cities = &[_]City{ City.init("ABC", 0, 0), City.init("DEF", 0, 1) },
     };
 
     const playerThird = Player{
         .name = "third",
         .generators = &[_]Generator{Generator.init(5, 1, 1, Resource.Oil)},
-        .cities = &[_]City{City.init("GHI")},
+        .cities = &[_]City{City.init("GHI", 0, 2)},
     };
 
     var players = &[_]Player{ playerThird, playerSecond, playerFirst };
@@ -132,19 +132,19 @@ test "turn order entirely on generators" {
     const playerFirst = Player{
         .name = "first",
         .generators = &[_]Generator{Generator.init(30, 1, 1, Resource.Oil)},
-        .cities = &[_]City{City.init("ABC")},
+        .cities = &[_]City{City.init("ABC", 0, 0)},
     };
 
     const playerSecond = Player{
         .name = "second",
         .generators = &[_]Generator{Generator.init(20, 1, 1, Resource.Oil)},
-        .cities = &[_]City{City.init("DEF")},
+        .cities = &[_]City{City.init("DEF", 0, 1)},
     };
 
     const playerThird = Player{
         .name = "third",
         .generators = &[_]Generator{Generator.init(10, 1, 1, Resource.Oil)},
-        .cities = &[_]City{City.init("GHI")},
+        .cities = &[_]City{City.init("GHI", 0, 2)},
     };
 
     var players = &[_]Player{ playerThird, playerSecond, playerFirst };

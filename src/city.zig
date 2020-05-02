@@ -1,3 +1,5 @@
+const std = @import("std");
+
 const Player = @import("player.zig").Player;
 
 /// A City is a location that up to three Players can settle in.
@@ -11,8 +13,20 @@ pub const City = struct {
     secondPlayer: ?Player = null,
     /// The third (if any) player to settle in the City
     thirdPlayer: ?Player = null,
+    /// X coordinate of City on map
+    x: u8,
+    /// Y coordinate of City on map
+    y: u8,
 
-    pub fn init(name: []const u8) City {
-        return City{ .name = name };
+    pub fn init(name: []const u8, x: u8, y: u8) City {
+        return City{
+            .name = name,
+            .x = x,
+            .y = y,
+        };
+    }
+
+    pub fn eq(self: City, other: City) bool {
+        return std.mem.eql(u8, self.name, other.name) and self.x == other.x and self.y == other.y;
     }
 };
