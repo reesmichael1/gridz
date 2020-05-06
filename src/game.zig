@@ -147,7 +147,7 @@ pub const Game = struct {
         //      - Bottom row of cities with no blanks below
         //      - 30 columns for each of the 4 columns of cities
         const padding_x = 25;
-        const padding_y = 4;
+        const padding_y = 8;
         const col_offset = 4;
         const diag_offset = 2;
         var buf: [4 * padding_y + 1][4 * padding_x]u8 = undefined;
