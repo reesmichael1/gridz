@@ -54,7 +54,7 @@ fn splitGenerators(allocator: *Allocator, gens: []Generator, r: *std.rand.Xorosh
 }
 
 /// Print an integer into a row of the buffer, starting at an x coordinate.
-fn printNumberAtCoord(buf: []u8, num: u8, x: u64) void {
+fn printNumberAtCoord(comptime T: type, buf: []u8, num: T, x: u64) void {
     const digits = @floatToInt(u8, @floor(@log10(@intToFloat(f32, num)))) + 1;
     _ = std.fmt.formatIntBuf(buf[x .. x + digits], num, 10, false, std.fmt.FormatOptions{});
 }
@@ -142,15 +142,20 @@ pub const Game = struct {
 
     /// Display the cities, their connections, and where players have built.
     fn displayMap(self: Game) !void {
-        // 17 rows by 120 columns:
-        //      - 4 rows of cities followed by three blank lines
-        //      - Bottom row of cities with no blanks below
-        //      - 30 columns for each of the 4 columns of cities
-        const padding_x = 25;
-        const padding_y = 8;
         const col_offset = 4;
         const diag_offset = 2;
-        var buf: [4 * padding_y + 1][4 * padding_x]u8 = undefined;
+        const box_width = 14;
+        const box_height = 5;
+        const rows = 5;
+        const cols = 4;
+        const box_spacing_x = 20;
+        const box_spacing_y = 6;
+        const padding_x = box_width + box_spacing_x;
+        const padding_y = box_height + box_spacing_y;
+
+        const height = (rows - 1) * padding_y + box_height + 1;
+        const width = (cols - 1) * padding_x + box_width + 1;
+        var buf: [height][width]u8 = undefined;
 
         // Initialize the buffer to spaces
         for (buf) |*row| {
@@ -163,105 +168,131 @@ pub const Game = struct {
         try stdout.print("\n\n", .{});
 
         for (self.grid.cities) |city| {
-            const start_x = city.x * padding_x;
+            const start_x = @as(usize, city.x * padding_x);
             const start_y = city.y * padding_y;
 
-            for (city.name) |ch, ix| {
-                buf[start_y][start_x + ix] = ch;
+            // Draw a box around the area for the city information.
+            var x = start_x;
+            var y = start_y + 1;
+            while (x < start_x + box_width) : (x += 1) {
+                buf[start_y][x] = '-';
+                buf[start_y + box_height][x] = '-';
             }
 
+            while (y < start_y + box_height) : (y += 1) {
+                buf[y][start_x] = '|';
+                buf[y][start_x + box_width] = '|';
+            }
+
+            // Print the city name in the box's first row.
+            y = start_y + 1;
+            x = start_x + (1 + box_width - city.name.len) / 2;
+            for (city.name) |ch, ix| {
+                buf[y][x + ix] = ch;
+            }
+
+            // Print the players (if any) who have built in the city.
+            y = start_y + 2;
+            x = start_x + 1;
+
+            var players = &[_]?Player{ city.firstPlayer, city.secondPlayer, city.thirdPlayer };
+            for (players) |maybe_player, ix| {
+                printNumberAtCoord(usize, buf[y + ix][0..], ix + 1, x);
+                buf[y + ix][x + 1] = '.';
+
+                if (maybe_player) |player| {
+                    for (player.name) |ch, name_ix| {
+                        // TODO: assert player names fit
+                        buf[y + ix][x + 3 + name_ix] = ch;
+                    }
+                }
+            }
+
+            // Print the connections between cities.
+            // It is assumed that map designers avoid crossings
+            // and otherwise verify that their layout is acceptable.
             const connections = try self.grid.getConnections(self.allocator, city);
             for (connections) |connection| {
                 const weight = self.grid.getWeight(city, connection) orelse unreachable;
-                // Draw horizontal bars between horizontal connections
+
                 if (connection.x == city.x + 1 and connection.y == city.y) {
-                    var x = start_x + city.name.len;
+                    // Draw horizontal bars between horizontal connections
+                    x = start_x + box_width + 1;
+                    y = start_y + 2;
+
                     while (@mod(x, padding_x) != 0) : (x += 1) {
-                        buf[start_y][x] = '-';
+                        buf[y][x] = '-';
                     }
 
-                    const weight_ix = start_x + city.name.len + (padding_x - city.name.len) / 2;
-                    printNumberAtCoord(buf[start_y][0..], weight, weight_ix);
-                } else if (connection.x == city.x and connection.y == city.y + 1) {
+                    const weight_ix = start_x + box_width + box_spacing_x / 2;
+                    printNumberAtCoord(u8, buf[y][0..], weight, weight_ix);
+                } else if (connection.y == city.y + 1 and connection.x == city.x) {
                     // Draw vertical bars between vertical connections
-                    var y = start_y + 1;
+                    x = start_x + box_width / 2;
+                    y = start_y + box_height + 1;
+
                     while (@mod(y, padding_y) != 0) : (y += 1) {
-                        if (@mod(y, padding_y) == padding_y / 2) {
-                            printNumberAtCoord(buf[y][0..], weight, start_x + col_offset);
-                        } else {
-                            buf[y][start_x + col_offset] = '|';
-                        }
+                        buf[y][x] = '|';
                     }
+
+                    const weight_ix = start_y + box_height + box_spacing_y / 2;
+                    printNumberAtCoord(u8, buf[weight_ix][0..], weight, x);
                 } else if (connection.x > city.x and connection.y > city.y) {
                     // Connections below and to the right
-                    var y = start_y + 1;
-                    var x = start_x + col_offset + diag_offset;
-                    const height_needed = (connection.y - city.y) * padding_y;
-                    const breakpoint = height_needed / 2;
+                    x = start_x + box_width + 1;
+                    y = start_y + box_height + 1;
 
+                    const diag_connector = '\\';
+                    const midpoint = start_y + box_height + box_spacing_y / 2;
                     var lines_needed: u8 = 0;
-
-                    while (y - start_y < breakpoint) {
-                        buf[y][x] = '\\';
+                    while (y < midpoint) {
+                        buf[y][x] = diag_connector;
                         y += 1;
                         x += 1;
                         lines_needed += 1;
                     }
 
-                    const delta_x = connection.x - city.x;
-                    const rows_needed = delta_x * padding_x - 2 * lines_needed - col_offset * delta_x;
-                    const weight_ix = start_x + col_offset + diag_offset + rows_needed / 2;
-                    var rows_printed: u8 = 0;
-
-                    while (rows_printed <= rows_needed) : (rows_printed += 1) {
+                    while (x < padding_x * connection.x - lines_needed) : (x += 1) {
                         buf[y][x] = '-';
-                        x += 1;
                     }
 
-                    printNumberAtCoord(buf[y][0..], weight, weight_ix);
-                    var lines_printed: u8 = 1;
                     y += 1;
-
-                    while (lines_printed <= lines_needed) : (lines_printed += 1) {
-                        buf[y][x] = '\\';
+                    while (@mod(y, padding_y) != 0) {
+                        buf[y][x] = diag_connector;
                         y += 1;
                         x += 1;
                     }
+
+                    const weight_ix = start_x + box_width + box_spacing_x / 2;
+                    printNumberAtCoord(u8, buf[midpoint][0..], weight, weight_ix);
                 } else if (city.x > 0 and connection.x == city.x - 1 and connection.y > city.y) {
                     // Connections below and to the left
-                    var y = start_y + 1;
-                    var x = start_x + col_offset - diag_offset;
-                    const height_needed = (connection.y - city.y) * padding_y;
-                    const breakpoint = height_needed / 2;
+                    x = start_x - 1;
+                    y = start_y + box_height + 1;
 
+                    const diag_connector = '/';
+                    const midpoint = start_y + box_height + box_spacing_y / 2;
                     var lines_needed: u8 = 0;
-
-                    while (y - start_y < breakpoint) {
-                        buf[y][x] = '/';
+                    while (y < midpoint) {
+                        buf[y][x] = diag_connector;
                         y += 1;
                         x -= 1;
                         lines_needed += 1;
                     }
 
-                    const delta_x = city.x - connection.x;
-                    const rows_needed = delta_x * padding_x - 2 * lines_needed - col_offset * delta_x;
-                    const weight_ix = start_x - rows_needed / 2;
-                    var rows_printed: u8 = 0;
-
-                    while (rows_printed <= rows_needed) : (rows_printed += 1) {
+                    while (x > padding_x * connection.x + box_width + lines_needed) : (x -= 1) {
                         buf[y][x] = '-';
-                        x -= 1;
                     }
 
-                    printNumberAtCoord(buf[y][0..], weight, weight_ix);
-                    var lines_printed: u8 = 1;
                     y += 1;
-
-                    while (lines_printed <= lines_needed) : (lines_printed += 1) {
-                        buf[y][x] = '/';
+                    while (@mod(y, padding_y) != 0) {
+                        buf[y][x] = diag_connector;
                         y += 1;
                         x -= 1;
                     }
+
+                    const weight_ix = start_x - padding_x + box_width + box_spacing_x / 2;
+                    printNumberAtCoord(u8, buf[midpoint][0..], weight, weight_ix);
                 }
             }
         }
