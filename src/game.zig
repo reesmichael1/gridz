@@ -243,7 +243,8 @@ pub const Game = struct {
                     y = start_y + box_height + 1;
 
                     const diag_connector = '\\';
-                    const midpoint = start_y + box_height + box_spacing_y / 2;
+                    const delta = (box_spacing_y + (connection.y - city.y - 1) * padding_y) / 2;
+                    const midpoint = start_y + box_height + delta;
                     var lines_needed: u8 = 0;
                     while (y < midpoint) {
                         buf[y][x] = diag_connector;
@@ -257,7 +258,7 @@ pub const Game = struct {
                     }
 
                     y += 1;
-                    while (@mod(y, padding_y) != 0) {
+                    while (y != padding_y * connection.y) {
                         buf[y][x] = diag_connector;
                         y += 1;
                         x += 1;
@@ -271,7 +272,8 @@ pub const Game = struct {
                     y = start_y + box_height + 1;
 
                     const diag_connector = '/';
-                    const midpoint = start_y + box_height + box_spacing_y / 2;
+                    const delta = (box_spacing_y + (connection.y - city.y - 1) * padding_y) / 2;
+                    const midpoint = start_y + box_height + delta;
                     var lines_needed: u8 = 0;
                     while (y < midpoint) {
                         buf[y][x] = diag_connector;
@@ -285,7 +287,7 @@ pub const Game = struct {
                     }
 
                     y += 1;
-                    while (@mod(y, padding_y) != 0) {
+                    while (y != padding_y * connection.y) {
                         buf[y][x] = diag_connector;
                         y += 1;
                         x -= 1;
