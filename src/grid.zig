@@ -80,6 +80,102 @@ pub const Grid = struct {
 
         return weight;
     }
+
+    /// Find a city whose name matches the given string.
+    /// If none match, then null is returned.
+    pub fn findCityByName(self: Grid, name: []const u8) ?*City {
+        for (self.cities) |*city| {
+            if (std.mem.eql(u8, name, city.name)) {
+                return city;
+            }
+        }
+
+        return null;
+    }
+
+    /// Find the cheapest cost of adding a city to a Player's network.
+    /// If there are no cities in the Player's network,
+    /// then the connection cost is 0. Otherwise, it is the cheapest
+    /// path from one of the Player's cities to the target city.
+    pub fn getMinConnectionCost(self: Grid, allocator: *Allocator, city: City, network: []City) !u64 {
+        if (network.len == 0) {
+            return 0;
+        }
+
+        // Use Dijkstra's algorithm to calculate the cost from the target city
+        // to every other city in the grid.
+        // Then, compare the cost of going to each city in the network
+        // to find the cheapest one.
+        var visited = std.BufSet.init(allocator);
+        defer visited.deinit();
+
+        var unvisited = std.BufSet.init(allocator);
+        defer unvisited.deinit();
+
+        var cities_by_name = std.StringHashMap(City).init(allocator);
+        var distances = std.AutoHashMap(City, u64).init(allocator);
+
+        for (self.cities) |node| {
+            try unvisited.put(node.name);
+            _ = try distances.put(node, std.math.maxInt(u64));
+            _ = try cities_by_name.put(node.name, node);
+        }
+
+        _ = try distances.put(city, 0);
+
+        var current_node = city;
+
+        while (unvisited.count() > 0) {
+            const current_distance = distances.getValue(current_node).?;
+            const connections = try self.getConnections(allocator, current_node);
+
+            for (connections) |connection| {
+                if (!unvisited.exists(connection.name)) {
+                    continue;
+                }
+
+                const connection_value = distances.getValue(connection).?;
+                const connection_weight = self.getWeight(current_node, connection).?;
+                const new_weight = current_distance + connection_weight;
+                if (connection_value > new_weight) {
+                    _ = try distances.put(connection, new_weight);
+                }
+            }
+
+            unvisited.delete(current_node.name);
+
+            var next: ?City = null;
+            var it = unvisited.iterator();
+            while (true) {
+                const entry = it.next() orelse break;
+                const next_unvisited = cities_by_name.getValue(entry.key).?;
+                if (next == null) {
+                    next = next_unvisited;
+                    continue;
+                }
+                if (distances.getValue(next_unvisited).? < distances.getValue(next.?).?) {
+                    next = next_unvisited;
+                }
+            }
+
+            if (next) |unwrapped| {
+                current_node = unwrapped;
+            } else {
+                // If we couldn't find a new city to start the algorithm on, then we're done.
+                break;
+            }
+        }
+
+        var min = distances.getValue(network[0]).?;
+        for (network[1..]) |network_city| {
+            const distance = distances.getValue(network_city).?;
+            if (distance < min) {
+                min = distance;
+            }
+        }
+
+        return min;
+    }
 };
 
 fn loadTestGrid(allocator: *Allocator) !Grid {
@@ -178,4 +274,30 @@ test "calculating connection weight" {
 
     testing.expectEqual(@as(u8, 5), grid.getWeight(grid.cities[0], grid.cities[1]).?);
     testing.expectEqual(@as(u8, 3), grid.getWeight(grid.cities[1], grid.cities[3]).?);
+}
+
+test "calculating connection costs" {
+    var arena = std.heap.ArenaAllocator.init(testing.allocator);
+    defer arena.deinit();
+
+    const grid = try loadTestGrid(&arena.allocator);
+
+    // Want to start with A
+    testing.expectEqual(@as(u64, 0), try grid.getMinConnectionCost(&arena.allocator, grid.cities[0], &[_]City{}));
+    // Have A, want to connect to B
+    testing.expectEqual(@as(u64, 5), try grid.getMinConnectionCost(&arena.allocator, grid.cities[1], &[_]City{
+        grid.cities[0],
+    }));
+
+    // Have A and B, want to connect to C
+    testing.expectEqual(@as(u64, 5), try grid.getMinConnectionCost(&arena.allocator, grid.cities[2], &[_]City{
+        grid.cities[0],
+        grid.cities[1],
+    }));
+
+    // Have B and E, want to connect to C
+    testing.expectEqual(@as(u64, 7), try grid.getMinConnectionCost(&arena.allocator, grid.cities[2], &[_]City{
+        grid.cities[1],
+        grid.cities[4],
+    }));
 }

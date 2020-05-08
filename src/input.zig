@@ -5,15 +5,8 @@ pub fn getNumberFromUser(comptime T: type, comptime prompt: []const u8, args: va
     const stdin = std.io.getStdIn();
 
     while (true) {
-        try stdout.print(prompt, args);
         var line_buf: [10]u8 = undefined;
-        const input = try stdin.read(&line_buf);
-        if (input == line_buf.len) {
-            try stdout.print("Input too long.\n", .{});
-            continue;
-        }
-
-        const line = std.mem.trimRight(u8, line_buf[0..input], "\r\n");
+        const line = try askUserForInput(prompt, args, &line_buf);
 
         if (line.len == 0) {
             continue;
@@ -33,18 +26,9 @@ pub fn askYesOrNo(comptime prompt: []const u8, args: var) !bool {
     const stdin = std.io.getStdIn();
 
     while (true) {
-        try stdout.print(prompt, args);
         var line_buf: [10]u8 = undefined;
-        const amt = try stdin.read(&line_buf);
+        const answer = try askUserForInput(prompt, args, &line_buf);
 
-        // This can cause some annoying behavior if you abuse it...so, don't abuse it :)
-        // It's temporary anyway until we have a GUI.
-        if (amt == line_buf.len) {
-            try stdout.print("Input too long--please type 'y' or 'n'\n", .{});
-            continue;
-        }
-
-        const answer = std.mem.trimRight(u8, line_buf[0..amt], "\r\n");
         if (std.mem.eql(u8, answer, &[_]u8{'y'})) {
             return true;
         } else if (std.mem.eql(u8, answer, &[_]u8{'n'})) {
@@ -52,5 +36,22 @@ pub fn askYesOrNo(comptime prompt: []const u8, args: var) !bool {
         } else {
             try stdout.print("Unrecognized input--please enter 'y' or 'n'\n", .{});
         }
+    }
+}
+
+pub fn askUserForInput(comptime prompt: []const u8, args: var, buf: []u8) ![]const u8 {
+    const stdout = std.io.getStdOut().outStream();
+    const stdin = std.io.getStdIn();
+
+    while (true) {
+        try stdout.print(prompt, args);
+
+        const amt = try stdin.read(buf);
+        if (amt == buf.len) {
+            try stdout.print("Input too long\n", .{});
+            continue;
+        }
+
+        return std.mem.trimRight(u8, buf[0..amt], "\r\n");
     }
 }

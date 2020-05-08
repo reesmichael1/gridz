@@ -7,17 +7,13 @@ const player_mod = @import("player.zig");
 const input = @import("input.zig");
 
 const Block = @import("resource_market.zig").Block;
+const City = @import("city.zig").City;
+const GameStage = @import("stage.zig").GameStage;
 const Generator = gen_mod.Generator;
 const Grid = @import("grid.zig").Grid;
 const Loader = @import("loader.zig").Loader;
 const Market = @import("resource_market.zig").Market;
 const Player = player_mod.Player;
-
-const GameStage = enum {
-    Stage1,
-    Stage2,
-    Stage3,
-};
 
 // Do this in a function to avoid a compiler error;
 // about overwriting strings of different lengths.
@@ -123,6 +119,7 @@ pub const Game = struct {
         }
 
         try self.phase3();
+        try self.phase4();
 
         self.has_ended = true;
     }
@@ -466,6 +463,96 @@ pub const Game = struct {
             try self.displayResourceMarket();
 
             if (player_ix == 0) {
+                break;
+            }
+        }
+    }
+
+    /// Allow the players to build in the various cities.
+    fn phase4(self: *Game) !void {
+        const stdout = std.io.getStdOut().outStream();
+
+        var player_ix: usize = self.players.len - 1;
+
+        while (player_ix >= 0) : (player_ix -= 1) {
+            try self.buildCities(&self.players[player_ix]);
+
+            if (player_ix == 0) {
+                break;
+            }
+        }
+    }
+
+    fn buildCities(self: *Game, player: *Player) !void {
+        var built: usize = 0;
+        const stdout = std.io.getStdOut().outStream();
+
+        while (true) {
+            try self.displayMap();
+            try stdout.print("\n\n", .{});
+
+            var will_build: bool = undefined;
+            if (built == 0) {
+                const prompt = "{}, would you like to build a city this round? [y/n] ";
+                will_build = try input.askYesOrNo(prompt, .{player.name});
+            } else {
+                const prompt = "{}, would you like to build another city this round? [y/n] ";
+                will_build = try input.askYesOrNo(prompt, .{player.name});
+            }
+
+            if (!will_build) {
+                return;
+            }
+
+            choose_city: while (true) {
+                var buf: [15]u8 = undefined;
+                const name = try input.askUserForInput("Please enter the name of your next city: ", .{}, &buf);
+
+                // Verify that the city given exists and this player can build in it.
+                const city = self.grid.findCityByName(name) orelse {
+                    try stdout.print("There is no city called {}.\n", .{name});
+                    continue;
+                };
+
+                for (player.cities) |owned_city| {
+                    if (owned_city.eq(city.*)) {
+                        try stdout.print("You have already built in {}!\n", .{city.name});
+                        continue :choose_city;
+                    }
+                }
+
+                if (!city.canBuild(self.stage)) {
+                    try stdout.print("There isn't room in {} to build.\n", .{city.name});
+                    continue;
+                }
+
+                const build_cost = city.buildingCost();
+                const connection_cost = try self.grid.getMinConnectionCost(self.allocator, city.*, player.cities);
+                const total_cost = build_cost + connection_cost;
+
+                if (total_cost > player.money) {
+                    try stdout.print("You don't have enough money to build in {}.\n", .{city.name});
+                    break;
+                }
+
+                // Ask the player to confirm the total cost.
+                if (!try input.askYesOrNo("That will cost {} GZD, is that ok? [y/n] ", .{total_cost})) {
+                    break;
+                }
+
+                // Actually add the player to the city and the city to the player's network.
+                built += 1;
+                player.money -= total_cost;
+
+                city.addPlayer(player.*);
+
+                var cities = std.ArrayList(City).init(self.allocator);
+                for (player.cities) |owned_city| {
+                    try cities.append(owned_city);
+                }
+
+                try cities.append(city.*);
+                player.cities = cities.items;
                 break;
             }
         }
