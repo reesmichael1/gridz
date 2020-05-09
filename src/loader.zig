@@ -170,9 +170,9 @@ pub const Loader = struct {
     pub fn loadPlayers(self: Loader) ![]Player {
         // TODO: assert that each player has a unique name.
         var players = [_]Player{
-            Player.init("Alice"),
-            Player.init("Bob"),
-            Player.init("Charlie"),
+            Player.init(self.allocator, "Alice"),
+            Player.init(self.allocator, "Bob"),
+            Player.init(self.allocator, "Charlie"),
         };
 
         var players_list = std.ArrayList(Player).init(self.allocator);

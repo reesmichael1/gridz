@@ -88,24 +88,21 @@ test "building capacities in the various stages" {
     testing.expect(city.canBuild(GameStage.Stage3));
     testing.expectEqual(constants.first_city_cost, city.buildingCost());
 
-    // city.firstPlayer = Player.init("Player 1");
-    city.addPlayer(Player.init("Player 1"));
+    city.addPlayer(Player.init(testing.allocator, "Player 1"));
 
     testing.expect(!city.canBuild(GameStage.Stage1));
     testing.expect(city.canBuild(GameStage.Stage2));
     testing.expect(city.canBuild(GameStage.Stage3));
     testing.expectEqual(constants.second_city_cost, city.buildingCost());
 
-    // city.secondPlayer = Player.init("Player 2");
-    city.addPlayer(Player.init("Player 2"));
+    city.addPlayer(Player.init(testing.allocator, "Player 2"));
 
     testing.expect(!city.canBuild(GameStage.Stage1));
     testing.expect(!city.canBuild(GameStage.Stage2));
     testing.expect(city.canBuild(GameStage.Stage3));
     testing.expectEqual(constants.third_city_cost, city.buildingCost());
 
-    // city.thirdPlayer = Player.init("Player 3");
-    city.addPlayer(Player.init("Player 3"));
+    city.addPlayer(Player.init(testing.allocator, "Player 3"));
 
     testing.expect(!city.canBuild(GameStage.Stage1));
     testing.expect(!city.canBuild(GameStage.Stage2));

@@ -383,7 +383,7 @@ pub const Game = struct {
                     // from the list of players eligible to buy a generator.
                     to_remove = purchase.buyer;
 
-                    try purchase.buyer.buyGenerator(self.allocator, purchase.gen, purchase.cost);
+                    try purchase.buyer.buyGenerator(purchase.gen, purchase.cost);
 
                     // Update the generator markets by removing the purchased generator,
                     // replacing it with a generator from the stack,
@@ -562,7 +562,8 @@ pub const Game = struct {
 
     fn buyResources(self: *Game, player: *Player) !void {
         const stdout = std.io.getStdOut().outStream();
-        const can_store = try player.getStoreableResources(self.allocator);
+        const can_store = try player.getStoreableResources();
+        defer can_store.deinit();
 
         try stdout.print("Buying resources for {}\n", .{player.name});
 
