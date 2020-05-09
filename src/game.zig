@@ -208,7 +208,9 @@ pub const Game = struct {
             // Print the connections between cities.
             // It is assumed that map designers avoid crossings
             // and otherwise verify that their layout is acceptable.
-            const connections = try self.grid.getConnections(self.allocator, city);
+            const connections = try self.grid.getConnections(city);
+            defer self.allocator.free(connections);
+
             for (connections) |connection| {
                 const weight = self.grid.getWeight(city, connection) orelse unreachable;
 
@@ -527,7 +529,7 @@ pub const Game = struct {
                 }
 
                 const build_cost = city.buildingCost();
-                const connection_cost = try self.grid.getMinConnectionCost(self.allocator, city.*, player.cities);
+                const connection_cost = try self.grid.getMinConnectionCost(city.*, player.cities);
                 const total_cost = build_cost + connection_cost;
 
                 if (total_cost > player.money) {
