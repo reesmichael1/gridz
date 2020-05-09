@@ -416,7 +416,7 @@ pub const Game = struct {
                     }
                 },
                 auction.AuctionResultTag.Passed => |passer| {
-                    // If a player passed on buying a generator, they remove them
+                    // If a player passed on buying a generator, then remove them
                     // from the list of players eligible to buy a generator.
                     to_remove = passer;
                 },
