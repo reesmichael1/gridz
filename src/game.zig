@@ -129,6 +129,8 @@ pub const Game = struct {
         try self.phase3();
         try self.phase4();
 
+        try self.displayResourceMarket();
+
         self.has_ended = true;
     }
 
@@ -344,19 +346,68 @@ pub const Game = struct {
     fn displayResourceMarket(self: Game) !void {
         const stdout = std.io.getStdOut().outStream();
 
-        for (self.resource_market.blocks) |block| {
-            try stdout.print("Resources available for {} GZD\n\n", .{block.cost});
+        // Display each resource box in a 3 x 4 grid
+        const box_width = 14;
+        const box_height = 7;
+        const box_spacing_x = 3;
+        const box_spacing_y = 2;
 
-            for (block.resources) |resource| {
-                try stdout.print("{}: {}/{}\n", .{
-                    resource.resource,
-                    resource.count_filled,
-                    resource.count_available,
-                });
+        const padding_x = box_width + box_spacing_x;
+        const padding_y = box_height + box_spacing_y;
+
+        const num_rows = 3;
+        const num_cols = 4;
+
+        const height = num_rows * padding_y - box_spacing_y + 1;
+        const width = num_cols * padding_x - box_spacing_x + 1;
+
+        var buf: [height][width]u8 = undefined;
+
+        // Initialize the buffer to spaces
+        for (buf) |*row| {
+            for (row) |_, ix| {
+                row[ix] = ' ';
+            }
+        }
+
+        for (self.resource_market.blocks) |block, ix| {
+            const start_x = @mod(ix, num_cols) * padding_x;
+            const start_y = (ix / num_cols) * padding_y;
+
+            var col: u8 = 0;
+            var row: u8 = 1;
+
+            while (row < box_height) : (row += 1) {
+                buf[start_y + row][start_x] = '|';
+                buf[start_y + row][start_x + box_width] = '|';
             }
 
-            try stdout.print("\n", .{});
+            while (col < box_width) : (col += 1) {
+                buf[start_y][start_x + col] = '-';
+                buf[start_y + box_height][start_x + col] = '-';
+            }
+
+            const cost_x = (box_width - "1 GZD".len) / 2 + start_x + 1;
+            _ = try std.fmt.bufPrint(buf[start_y + 1][cost_x..], "{} GZD", .{
+                block.cost,
+            });
+
+            for (block.resources) |resource, resource_ix| {
+                _ = try std.fmt.bufPrint(buf[start_y + 3 + resource_ix][start_x + 1 ..], "{}/{} {}", .{
+                    resource.count_filled,
+                    resource.count_available,
+                    resource.resource,
+                });
+            }
         }
+
+        try stdout.print("Resources available:\n", .{});
+
+        for (buf) |row| {
+            try stdout.print("{}\n", .{row});
+        }
+
+        try stdout.print("\n", .{});
     }
 
     /// Determine player order for this turn.
