@@ -105,6 +105,14 @@ pub const Game = struct {
         };
     }
 
+    /// Release any allocated memory.
+    pub fn deinit(self: Game) void {
+        self.allocator.free(self.players);
+        self.allocator.free(self.gen_market);
+        self.allocator.free(self.hidden_generators);
+        self.resource_market.deinit();
+    }
+
     /// Run a turn of the game.
     pub fn nextTurn(self: *Game) !void {
         self.phase1(self.round == 1);

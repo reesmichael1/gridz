@@ -8,6 +8,7 @@ pub fn main() anyerror!void {
 
     const allocator = &arena.allocator;
     var game = try Game.init(allocator);
+    defer game.deinit();
 
     while (!game.has_ended) {
         try game.nextTurn();

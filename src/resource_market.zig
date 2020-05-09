@@ -28,11 +28,14 @@ const Block = struct {
 
 /// The Market keeps track of what resources are available at what cost.
 pub const Market = struct {
+    /// The allocator used for all necessary allocations.
+    allocator: *Allocator,
     /// The groups of Resources available in the Market.
     blocks: []Block,
 
     pub fn init(allocator: *Allocator) !Market {
         var blocks = std.ArrayList(Block).init(allocator);
+        defer blocks.deinit();
 
         var cost: u8 = 1;
         while (cost <= 8) : (cost += 1) {
@@ -70,14 +73,9 @@ pub const Market = struct {
                 },
             };
 
-            var resource_blocks = std.ArrayList(ResourceBlock).init(allocator);
-            for (resources) |block| {
-                try resource_blocks.append(block);
-            }
-
             try blocks.append(Block{
                 .cost = cost,
-                .resources = resource_blocks.items,
+                .resources = try std.mem.dupe(allocator, ResourceBlock, &resources),
             });
         }
 
@@ -106,7 +104,19 @@ pub const Market = struct {
             });
         }
 
-        return Market{ .blocks = blocks.items };
+        return Market{
+            .allocator = allocator,
+            .blocks = try std.mem.dupe(allocator, Block, blocks.items),
+        };
+    }
+
+    /// Release any allocated memory
+    pub fn deinit(self: Market) void {
+        for (self.blocks) |block| {
+            self.allocator.free(block.resources);
+        }
+
+        self.allocator.free(self.blocks);
     }
 
     /// Buy a number of a resource from the market.
@@ -156,10 +166,8 @@ pub const Market = struct {
 };
 
 test "buying coal from first block" {
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-
-    var market = try Market.init(&arena.allocator);
+    var market = try Market.init(testing.allocator);
+    defer market.deinit();
 
     std.testing.expectEqual(@as(u64, 2), try market.costOfResources(Resource.Coal, 2));
 
