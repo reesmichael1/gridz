@@ -52,10 +52,12 @@ pub fn auctionRound(game: *Game, eligible_players: []*Player, generators: []Gene
 
     const starter = eligible_players[0];
 
+    try stdout.print("{}, you have {} GZD.\n", .{ starter.name, starter.money });
+
     if (must_buy) {
-        try stdout.print("{}, you must buy a generator this round.\n", .{starter.name});
+        try stdout.print("You must buy a generator this round.\n", .{});
     } else {
-        const wants_to_buy = try input.askYesOrNo("{}, would you like to bid on a generator this round? [y/n] ", .{starter.name});
+        const wants_to_buy = try input.askYesOrNo("Would you like to bid on a generator this round? [y/n] ", .{});
         if (!wants_to_buy) {
             try stdout.print("Ok, you will not be able to buy a generator this round.\n", .{});
             return AuctionResult{ .Passed = starter };

@@ -140,7 +140,7 @@ pub const Game = struct {
 
         try stdout.print("Player order for turn {}:\n", .{self.round});
         for (self.players) |player, ix| {
-            try stdout.print("{}: {}\n", .{ ix + 1, player.name });
+            try stdout.print("{}: {} ({} GZD)\n", .{ ix + 1, player.name, player.money });
         }
 
         try self.displayMap();
@@ -552,13 +552,15 @@ pub const Game = struct {
             try self.displayMap();
             try stdout.print("\n\n", .{});
 
+            try stdout.print("{}, you have {} GZD.\n", .{ player.name, player.money });
+
             var will_build: bool = undefined;
             if (built == 0) {
-                const prompt = "{}, would you like to build a city this round? [y/n] ";
-                will_build = try input.askYesOrNo(prompt, .{player.name});
+                const prompt = "Would you like to build a city this round? [y/n] ";
+                will_build = try input.askYesOrNo(prompt, .{});
             } else {
-                const prompt = "{}, would you like to build another city this round? [y/n] ";
-                will_build = try input.askYesOrNo(prompt, .{player.name});
+                const prompt = "Would you like to build another city this round? [y/n] ";
+                will_build = try input.askYesOrNo(prompt, .{});
             }
 
             if (!will_build) {
@@ -624,13 +626,12 @@ pub const Game = struct {
         const can_store = try player.getStoreableResources();
         defer can_store.deinit();
 
-        try stdout.print("Buying resources for {}\n", .{player.name});
-
         var it = can_store.iterator();
         while (it.next()) |resource| {
             var to_buy: u8 = 0;
             var cost: u64 = 0;
             while (true) {
+                try stdout.print("{}, you have {} GZD.\n", .{ player.name, player.money });
                 to_buy = try input.getNumberFromUser(u8, "You can store up to {} {}. How many would you like to buy? ", .{
                     resource.value,
                     resource.key,
