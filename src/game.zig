@@ -637,11 +637,6 @@ pub const Game = struct {
                     resource.key,
                 });
 
-                if (to_buy == 0) {
-                    try stdout.print("Please enter a non-zero number.\n", .{});
-                    continue;
-                }
-
                 if (to_buy > resource.value) {
                     try stdout.print("You can store at most {} {}.\n", .{
                         resource.value,
