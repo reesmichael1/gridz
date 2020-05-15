@@ -176,10 +176,9 @@ test "buying coal from first block" {
 }
 
 test "buying coal across two blocks" {
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
+    var market = try Market.init(testing.allocator);
+    defer market.deinit();
 
-    var market = try Market.init(&arena.allocator);
     const expected_cost: u64 = 5;
     std.testing.expectEqual(expected_cost, try market.costOfResources(Resource.Coal, 4));
 
@@ -189,10 +188,8 @@ test "buying coal across two blocks" {
 }
 
 test "buying oil from first available block" {
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-
-    var market = try Market.init(&arena.allocator);
+    var market = try Market.init(testing.allocator);
+    defer market.deinit();
     const expected_cost: u64 = 3;
     std.testing.expectEqual(expected_cost, try market.costOfResources(Resource.Oil, 1));
 
@@ -201,9 +198,7 @@ test "buying oil from first available block" {
 }
 
 test "buying too many resources from the market fails" {
-    var arena = std.heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-
-    var market = try Market.init(&arena.allocator);
+    var market = try Market.init(testing.allocator);
+    defer market.deinit();
     std.testing.expectError(error.NotEnoughResources, market.costOfResources(Resource.Coal, 100));
 }
