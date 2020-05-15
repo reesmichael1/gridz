@@ -163,6 +163,35 @@ pub const Market = struct {
 
         return error.NotEnoughResources;
     }
+
+    /// Insert some new resources into the market.
+    pub fn refillResource(self: *Market, resource: Resource, count: u8) !void {
+        var backwards_blocks = try std.mem.dupe(self.allocator, Block, self.blocks);
+        defer self.allocator.free(backwards_blocks);
+
+        // TODO: assert that the original blocks are properly sorted
+        std.mem.reverse(Block, backwards_blocks);
+        var remaining: u8 = count;
+
+        for (backwards_blocks) |block| {
+            for (block.resources) |*r| {
+                if (r.resource == resource) {
+                    if (r.count_filled != r.count_available) {
+                        var to_fill = r.count_available - r.count_filled;
+                        if (to_fill > remaining) {
+                            to_fill = remaining;
+                        }
+                        remaining -= to_fill;
+                        r.count_filled += to_fill;
+
+                        if (remaining == 0) {
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+    }
 };
 
 test "buying coal from first block" {
@@ -201,4 +230,41 @@ test "buying too many resources from the market fails" {
     var market = try Market.init(testing.allocator);
     defer market.deinit();
     std.testing.expectError(error.NotEnoughResources, market.costOfResources(Resource.Coal, 100));
+}
+
+test "refilling resources in first block works" {
+    var market = try Market.init(testing.allocator);
+    defer market.deinit();
+
+    market.buyResource(Resource.Coal, 3);
+    try market.refillResource(Resource.Coal, 2);
+    std.testing.expectEqual(@as(u64, 2), market.blocks[0].resources[0].count_filled);
+}
+
+test "refilling resources across blocks works" {
+    var market = try Market.init(testing.allocator);
+    defer market.deinit();
+
+    market.buyResource(Resource.Coal, 5);
+    try market.refillResource(Resource.Coal, 3);
+    std.testing.expectEqual(@as(u64, 1), market.blocks[0].resources[0].count_filled);
+    std.testing.expectEqual(@as(u64, 3), market.blocks[1].resources[0].count_filled);
+}
+
+test "refilling resources multiple blocks in works" {
+    var market = try Market.init(testing.allocator);
+    defer market.deinit();
+
+    std.testing.expectEqual(@as(u64, 0), market.blocks[1].resources[1].count_filled);
+    try market.refillResource(Resource.Oil, 2);
+    std.testing.expectEqual(@as(u64, 2), market.blocks[1].resources[1].count_filled);
+}
+
+test "refilling too many resources does nothing" {
+    var market = try Market.init(testing.allocator);
+    defer market.deinit();
+
+    std.testing.expectEqual(@as(u64, 0), market.blocks[0].resources[3].count_filled);
+    try market.refillResource(Resource.Uranium, 20);
+    std.testing.expectEqual(@as(u64, 1), market.blocks[0].resources[3].count_filled);
 }
