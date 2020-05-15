@@ -22,6 +22,8 @@ pub const Player = struct {
     generators: []Generator,
     /// Cities that this player has constructed so far.
     cities: []City,
+    /// Resources that the player has purchased and has in reserve.
+    resources: []Resource,
 
     pub fn init(allocator: *Allocator, name: []const u8) Player {
         return Player{
@@ -29,12 +31,28 @@ pub const Player = struct {
             .name = name,
             .generators = &[_]Generator{},
             .cities = &[_]City{},
+            .resources = &[_]Resource{},
         };
     }
 
     pub fn deinit(self: Player) void {
         self.allocator.free(self.generators);
         self.allocator.free(self.cities);
+        self.allocator.free(self.resources);
+    }
+
+    /// Add a new resource to the player's stored resources.
+    pub fn buyResource(self: *Player, resource: Resource, count: u64) !void {
+        var added: u64 = 0;
+        var resources = std.ArrayList(Resource).init(self.allocator);
+        defer resources.deinit();
+        try resources.appendSlice(self.resources);
+
+        while (added < count) : (added += 1) {
+            try resources.append(resource);
+        }
+
+        self.resources = try std.mem.dupe(self.allocator, Resource, resources.items);
     }
 
     /// Actually perform the mechanics of buying a generator (i.e., deduct the cost
@@ -68,7 +86,52 @@ pub const Player = struct {
             _ = try map.put(generator.resource, current.value + 2 * generator.resource_count);
         }
 
+        for (self.resources) |resource| {
+            const current = try map.getOrPutValue(resource, 0);
+            _ = try map.put(resource, current.value - 1);
+        }
+
         return map;
+    }
+
+    /// Return true if the player has enough resources to power this generator,
+    /// and false otherwise.
+    pub fn canPowerGenerator(self: Player, generator: Generator) bool {
+        var available: u64 = 0;
+
+        for (self.resources) |resource| {
+            if (resource == generator.resource) {
+                available += 1;
+                if (available >= generator.resource_count) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// Deduct the resources needed to power a generator from the player's resources.
+    /// Will panic if called with a generator the player cannot power.
+    pub fn powerGenerator(self: *Player, generator: Generator) !void {
+        var resources = std.ArrayList(Resource).init(self.allocator);
+        defer resources.deinit();
+
+        var consumed: u64 = 0;
+        for (self.resources) |resource| {
+            if (resource != generator.resource or consumed >= generator.resource_count) {
+                try resources.append(resource);
+            } else {
+                consumed += 1;
+            }
+        }
+
+        if (consumed < generator.resource_count) {
+            unreachable;
+        }
+
+        self.allocator.free(self.resources);
+        self.resources = try std.mem.dupe(self.allocator, Resource, resources.items);
     }
 };
 
@@ -93,6 +156,7 @@ test "determine turn order" {
         .name = "first on cities",
         .generators = &[_]Generator{Generator.init(3, 1, 1, Resource.Oil)},
         .cities = &[_]City{ City.init("ABC", 0, 1), City.init("DEF", 0, 2) },
+        .resources = &[_]Resource{},
     };
 
     const playerSecond = Player{
@@ -100,6 +164,7 @@ test "determine turn order" {
         .name = "second on generators",
         .generators = &[_]Generator{Generator.init(8, 1, 1, Resource.Oil)},
         .cities = &[_]City{City.init("ABC", 0, 1)},
+        .resources = &[_]Resource{},
     };
 
     const playerThird = Player{
@@ -107,6 +172,7 @@ test "determine turn order" {
         .name = "third on generators",
         .generators = &[_]Generator{Generator.init(5, 1, 1, Resource.Oil)},
         .cities = &[_]City{City.init("DEF", 0, 2)},
+        .resources = &[_]Resource{},
     };
 
     var players = &[_]Player{ playerSecond, playerThird, playerFirst };
@@ -121,6 +187,7 @@ test "turn order entirely on cities" {
         .name = "first",
         .generators = &[_]Generator{Generator.init(3, 1, 1, Resource.Oil)},
         .cities = &[_]City{ City.init("ABC", 0, 0), City.init("DEF", 0, 1), City.init("GHI", 0, 2) },
+        .resources = &[_]Resource{},
     };
 
     const playerSecond = Player{
@@ -128,6 +195,7 @@ test "turn order entirely on cities" {
         .name = "second",
         .generators = &[_]Generator{Generator.init(8, 1, 1, Resource.Oil)},
         .cities = &[_]City{ City.init("ABC", 0, 0), City.init("DEF", 0, 1) },
+        .resources = &[_]Resource{},
     };
 
     const playerThird = Player{
@@ -135,6 +203,7 @@ test "turn order entirely on cities" {
         .name = "third",
         .generators = &[_]Generator{Generator.init(5, 1, 1, Resource.Oil)},
         .cities = &[_]City{City.init("GHI", 0, 2)},
+        .resources = &[_]Resource{},
     };
 
     var players = &[_]Player{ playerThird, playerSecond, playerFirst };
@@ -149,6 +218,7 @@ test "turn order entirely on generators" {
         .name = "first",
         .generators = &[_]Generator{Generator.init(30, 1, 1, Resource.Oil)},
         .cities = &[_]City{City.init("ABC", 0, 0)},
+        .resources = &[_]Resource{},
     };
 
     const playerSecond = Player{
@@ -156,6 +226,7 @@ test "turn order entirely on generators" {
         .name = "second",
         .generators = &[_]Generator{Generator.init(20, 1, 1, Resource.Oil)},
         .cities = &[_]City{City.init("DEF", 0, 1)},
+        .resources = &[_]Resource{},
     };
 
     const playerThird = Player{
@@ -163,6 +234,7 @@ test "turn order entirely on generators" {
         .name = "third",
         .generators = &[_]Generator{Generator.init(10, 1, 1, Resource.Oil)},
         .cities = &[_]City{City.init("GHI", 0, 2)},
+        .resources = &[_]Resource{},
     };
 
     var players = &[_]Player{ playerThird, playerSecond, playerFirst };
@@ -177,6 +249,7 @@ test "player can store single resource" {
         .name = "coal",
         .generators = &[_]Generator{Generator.init(10, 1, 2, Resource.Coal)},
         .cities = &[_]City{},
+        .resources = &[_]Resource{},
     };
 
     const can_store = try playerWithCoal.getStoreableResources();
@@ -194,6 +267,7 @@ test "player can store multiple resources" {
             Generator.init(20, 1, 3, Resource.Oil),
         },
         .cities = &[_]City{},
+        .resources = &[_]Resource{},
     };
 
     const can_store = try playerWithCoalAndOil.getStoreableResources();
@@ -212,10 +286,56 @@ test "player can store same resource across multiple generators" {
             Generator.init(20, 1, 3, Resource.Coal),
         },
         .cities = &[_]City{},
+        .resources = &[_]Resource{},
     };
 
     const can_store = try playerWithTwoCoal.getStoreableResources();
     defer can_store.deinit();
 
     testing.expect(can_store.getValue(Resource.Coal).? == 10);
+}
+
+test "player with existing resources can buy fewer resources" {
+    var resources = [_]Resource{ Resource.Coal, Resource.Coal };
+    var playerWithTwoCoal = Player{
+        .allocator = testing.allocator,
+        .name = "two coal generators",
+        .generators = &[_]Generator{
+            Generator.init(10, 1, 2, Resource.Coal),
+            Generator.init(20, 1, 3, Resource.Coal),
+        },
+        .cities = &[_]City{},
+        .resources = &resources,
+    };
+
+    const can_store = try playerWithTwoCoal.getStoreableResources();
+    defer can_store.deinit();
+
+    testing.expect(can_store.getValue(Resource.Coal).? == 8);
+}
+
+test "player can determine if can power generators" {
+    var player = Player{
+        .allocator = testing.allocator,
+        .name = "Player",
+        .resources = try std.mem.dupe(testing.allocator, Resource, &[_]Resource{
+            Resource.Coal,
+            Resource.Coal,
+            Resource.Uranium,
+        }),
+        .generators = &[_]Generator{},
+        .cities = &[_]City{},
+    };
+
+    defer player.deinit();
+
+    testing.expect(player.canPowerGenerator(Generator.init(1, 1, 1, Resource.Coal)));
+    testing.expect(player.canPowerGenerator(Generator.init(2, 2, 2, Resource.Coal)));
+    testing.expect(!player.canPowerGenerator(Generator.init(3, 3, 3, Resource.Coal)));
+
+    try player.powerGenerator(Generator.init(2, 2, 2, Resource.Coal));
+    std.testing.expectEqualSlices(Resource, &[_]Resource{Resource.Uranium}, player.resources);
+
+    testing.expect(player.canPowerGenerator(Generator.init(4, 4, 1, Resource.Uranium)));
+    testing.expect(!player.canPowerGenerator(Generator.init(5, 5, 5, Resource.Oil)));
 }
