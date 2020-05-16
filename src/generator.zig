@@ -25,6 +25,13 @@ pub const Generator = struct {
             .resource = resource,
         };
     }
+
+    pub fn isEco(self: Generator) bool {
+        return switch (self.resource) {
+            Resource.Wind, Resource.Hydro, Resource.Solar => true,
+            else => false,
+        };
+    }
 };
 
 /// Return true if gen1 has a lower index than gen2, false otherwise.

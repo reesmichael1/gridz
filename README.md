@@ -10,7 +10,7 @@ A [Power Grid](https://en.wikipedia.org/wiki/Power_Grid) inspired game.
 
 The complete gameplay will be implemented as a CLI game. After the internals are complete, a GUI will be added. It's possible the GUI will be optional and the CLI interface will continue to be maintained separately. 
 
-Currently, only a small part of the gameplay is finished. 
+Currently, you can play through the first two stages, but the third stage is not implemented yet. For development, `gridz` uses a hard-coded map and player list, but these will be made customizable before the first release.
 
 ## Gameplay
 

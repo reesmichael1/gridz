@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const auction = @import("auction.zig");
+const constants = @import("constants.zig");
 const gen_mod = @import("generator.zig");
 const player_mod = @import("player.zig");
 const input = @import("input.zig");
@@ -14,11 +15,12 @@ const Grid = @import("grid.zig").Grid;
 const Loader = @import("loader.zig").Loader;
 const Market = @import("resource_market.zig").Market;
 const Player = player_mod.Player;
+const Resource = @import("resource.zig").Resource;
 
 // Do this in a function to avoid a compiler error;
 // about overwriting strings of different lengths.
-fn getCitiesToShow(gen: Generator) []const u8 {
-    if (gen.can_power == 1) {
+fn getCitiesToShow(comptime T: type, count: T) []const u8 {
+    if (count == 1) {
         return "city";
     }
 
@@ -68,6 +70,8 @@ pub const Game = struct {
     future_gens: []Generator,
     /// Remaining generators that have not yet been revealed.
     hidden_generators: []Generator,
+    /// Generators that are reserved for stage 3.
+    reserve_gens: []Generator,
     /// Resources that can be bought by Players.
     resource_market: Market,
     /// The current stage of the game.
@@ -97,6 +101,7 @@ pub const Game = struct {
             .gen_market = split[0],
             .future_gens = split[1],
             .hidden_generators = split[2],
+            .reserve_gens = &[_]Generator{},
             .resource_market = try loader.loadResourceMarket(),
             .stage = GameStage.Stage1,
             .rng = rng,
@@ -129,9 +134,9 @@ pub const Game = struct {
         try self.phase3();
         try self.phase4();
 
-        try self.displayResourceMarket();
+        self.checkForStageChange();
 
-        self.has_ended = true;
+        try self.phase5();
     }
 
     /// Display the current game state for the players to see.
@@ -324,7 +329,7 @@ pub const Game = struct {
                 generator.resource_count,
                 generator.resource,
                 generator.can_power,
-                getCitiesToShow(generator),
+                getCitiesToShow(u8, generator.can_power),
             });
         }
 
@@ -335,7 +340,7 @@ pub const Game = struct {
                 generator.resource_count,
                 generator.resource,
                 generator.can_power,
-                getCitiesToShow(generator),
+                getCitiesToShow(u8, generator.can_power),
             });
         }
 
@@ -544,6 +549,49 @@ pub const Game = struct {
         }
     }
 
+    /// Take care of all of the business at the end of each turn,
+    /// and determine if the game should move to a new stage or is over.
+    fn phase5(self: *Game) !void {
+        const stdout = std.io.getStdOut().outStream();
+
+        // Ask each utuplayer to choose how many cities they will power.
+        for (self.players) |*player| {
+            const cities_powered = try self.powerCities(player);
+            player.money += constants.getPaymentForCities(cities_powered);
+        }
+
+        // Refill the resource market.
+        for ([_]Resource{ Resource.Coal, Resource.Oil, Resource.Garbage, Resource.Uranium }) |resource| {
+            const count = constants.getResourcesToRefill(self.stage, resource);
+            try self.resource_market.refillResource(resource, count);
+        }
+
+        self.round += 1;
+
+        // Remove the highest numbered generator from the market and store it away for stage 3.
+        if (self.stage == GameStage.Stage3) {
+            return;
+        }
+
+        var reserve_gens = std.ArrayList(Generator).init(self.allocator);
+        defer reserve_gens.deinit();
+
+        var current_gens = std.ArrayList(Generator).init(self.allocator);
+        defer current_gens.deinit();
+
+        try reserve_gens.appendSlice(self.reserve_gens);
+        try reserve_gens.append(self.future_gens[self.future_gens.len - 1]);
+        self.future_gens = self.future_gens[0 .. self.future_gens.len - 1];
+
+        try current_gens.appendSlice(self.gen_market);
+        try current_gens.appendSlice(self.future_gens);
+        try current_gens.append(self.hidden_generators[0]);
+        self.hidden_generators = self.hidden_generators[1..];
+
+        try self.updateGenMarket(try std.mem.dupe(self.allocator, Generator, current_gens.items));
+        self.reserve_gens = try std.mem.dupe(self.allocator, Generator, reserve_gens.items);
+    }
+
     fn buildCities(self: *Game, player: *Player) !void {
         var built: usize = 0;
         const stdout = std.io.getStdOut().outStream();
@@ -630,6 +678,11 @@ pub const Game = struct {
         while (it.next()) |resource| {
             var to_buy: u8 = 0;
             var cost: u64 = 0;
+
+            if (resource.value == 0) {
+                continue;
+            }
+
             while (true) {
                 try stdout.print("{}, you have {} GZD.\n", .{ player.name, player.money });
                 to_buy = try input.getNumberFromUser(u8, "You can store up to {} {}. How many would you like to buy? ", .{
@@ -659,10 +712,85 @@ pub const Game = struct {
             }
 
             self.resource_market.buyResource(resource.key, to_buy);
+            try player.buyResource(resource.key, to_buy);
             player.money -= cost;
         }
 
         try stdout.print("\n", .{});
+    }
+
+    fn powerCities(self: Game, player: *Player) !u8 {
+        const stdout = std.io.getStdIn().outStream();
+
+        if (player.cities.len == 0) {
+            try stdout.print("{}, you don't have any cities to power.\n", .{player.name});
+            return 0;
+        }
+
+        try stdout.print("\n{}, you have {} {}. ", .{
+            player.name,
+            player.cities.len,
+            getCitiesToShow(usize, player.cities.len),
+        });
+
+        try stdout.print("You can power these generators:\n\n", .{});
+        for (player.generators) |generator| {
+            if (!player.canPowerGenerator(generator)) {
+                continue;
+            }
+
+            try stdout.print("Generator {}: uses {} {} to power {} {}\n", .{
+                generator.index,
+                generator.resource_count,
+                generator.resource,
+                generator.can_power,
+                getCitiesToShow(u8, generator.can_power),
+            });
+        }
+
+        try stdout.print("\n", .{});
+
+        var powered: u8 = 0;
+
+        for (player.generators) |generator| {
+            if (generator.isEco()) {
+                powered += generator.can_power;
+            }
+        }
+
+        if (powered != 0) {
+            try stdout.print("You can already power {} {} with your ecological generators.\n", .{
+                powered,
+                getCitiesToShow(u8, powered),
+            });
+
+            if (powered >= player.cities.len) {
+                return @intCast(u8, player.cities.len);
+            }
+        }
+
+        for (player.generators) |generator| {
+            if (player.canPowerGenerator(generator)) {
+                const will_power = try input.askYesOrNo("Would you like to power {} {} with generator {} for {} {}? [y/n] ", .{
+                    generator.can_power,
+                    getCitiesToShow(u8, generator.can_power),
+                    generator.index,
+                    generator.resource_count,
+                    generator.resource,
+                });
+
+                if (will_power) {
+                    powered += generator.can_power;
+                    try player.powerGenerator(generator);
+                }
+
+                if (powered > player.cities.len) {
+                    return @intCast(u8, player.cities.len);
+                }
+            }
+        }
+
+        return powered;
     }
 
     /// Assign generators into current and future markets in the correct order.
@@ -671,5 +799,19 @@ pub const Game = struct {
 
         self.gen_market = gens[0..4];
         self.future_gens = gens[4..];
+    }
+
+    /// If the game has moved from stage 1 into stage 2, update the game state.
+    fn checkForStageChange(self: *Game) void {
+        if (self.stage != GameStage.Stage1) {
+            return;
+        }
+
+        for (self.players) |player| {
+            if (player.cities.len >= constants.getStage2Trigger(self.players.len)) {
+                self.stage = GameStage.Stage2;
+                return;
+            }
+        }
     }
 };
