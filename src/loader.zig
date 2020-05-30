@@ -66,7 +66,7 @@ pub const Loader = struct {
 
         // Rather than hard-coding a huge list of generators,
         // we randomly generate one for now.
-        const seed = std.time.milliTimestamp();
+        const seed = @intCast(u64, std.time.milliTimestamp());
         var r = std.rand.DefaultPrng.init(seed);
 
         var generators = std.ArrayList(Generator).init(self.allocator);

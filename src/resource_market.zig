@@ -268,3 +268,10 @@ test "refilling too many resources does nothing" {
     try market.refillResource(Resource.Uranium, 20);
     std.testing.expectEqual(@as(u64, 1), market.blocks[0].resources[3].count_filled);
 }
+
+test "can buy zero resources" {
+    var market = try Market.init(testing.allocator);
+    defer market.deinit();
+
+    std.testing.expectEqual(@as(u64, 0), try market.costOfResources(Resource.Coal, 0));
+}

@@ -17,8 +17,6 @@ const Market = @import("resource_market.zig").Market;
 const Player = player_mod.Player;
 const Resource = @import("resource.zig").Resource;
 
-// Do this in a function to avoid a compiler error;
-// about overwriting strings of different lengths.
 fn getCitiesToShow(comptime T: type, count: T) []const u8 {
     if (count == 1) {
         return "city";
@@ -89,7 +87,7 @@ pub const Game = struct {
     pub fn init(allocator: *Allocator) !Game {
         const loader = Loader.init(allocator);
 
-        var rng = std.rand.DefaultPrng.init(std.time.milliTimestamp());
+        var rng = std.rand.DefaultPrng.init(@intCast(u64, std.time.milliTimestamp()));
         const generators = try loader.loadGenerators();
         const split = try splitGenerators(allocator, generators, &rng);
 
@@ -557,7 +555,9 @@ pub const Game = struct {
         // Ask each utuplayer to choose how many cities they will power.
         for (self.players) |*player| {
             const cities_powered = try self.powerCities(player);
-            player.money += constants.getPaymentForCities(cities_powered);
+            const earned = constants.getPaymentForCities(cities_powered);
+            try stdout.print("{}, you earned {} GZD.\n", .{ player.name, earned });
+            player.money += earned;
         }
 
         // Refill the resource market.
@@ -590,6 +590,8 @@ pub const Game = struct {
 
         try self.updateGenMarket(try std.mem.dupe(self.allocator, Generator, current_gens.items));
         self.reserve_gens = try std.mem.dupe(self.allocator, Generator, reserve_gens.items);
+
+        try stdout.print("\n", .{});
     }
 
     fn buildCities(self: *Game, player: *Player) !void {
@@ -600,7 +602,22 @@ pub const Game = struct {
             try self.displayMap();
             try stdout.print("\n\n", .{});
 
-            try stdout.print("{}, you have {} GZD.\n", .{ player.name, player.money });
+            var can_power: u64 = 0;
+            for (player.generators) |gen| {
+                can_power += gen.can_power;
+            }
+
+            try stdout.print("{}, you have {} GZD and have enough generators to power {} {}.\n", .{
+                player.name,
+                player.money,
+                can_power,
+                getCitiesToShow(u64, can_power),
+            });
+
+            try stdout.print("You currently have {} {}. ", .{
+                player.cities.len,
+                getCitiesToShow(usize, player.cities.len),
+            });
 
             var will_build: bool = undefined;
             if (built == 0) {
@@ -683,8 +700,9 @@ pub const Game = struct {
                 continue;
             }
 
+            try stdout.print("{}, you have {} GZD.\n", .{ player.name, player.money });
+
             while (true) {
-                try stdout.print("{}, you have {} GZD.\n", .{ player.name, player.money });
                 to_buy = try input.getNumberFromUser(u8, "You can store up to {} {}. How many would you like to buy? ", .{
                     resource.value,
                     resource.key,
@@ -708,7 +726,14 @@ pub const Game = struct {
                     continue;
                 }
 
-                break;
+                if (cost == 0) {
+                    break;
+                }
+
+                const verify = try input.askYesOrNo("That will cost {} GZD. Is that ok? [y/n] ", .{cost});
+                if (verify) {
+                    break;
+                }
             }
 
             self.resource_market.buyResource(resource.key, to_buy);
@@ -732,6 +757,11 @@ pub const Game = struct {
             player.cities.len,
             getCitiesToShow(usize, player.cities.len),
         });
+
+        if (player.resources.len == 0) {
+            try stdout.print("You don't have any resources to power a generator.\n", .{});
+            return 0;
+        }
 
         try stdout.print("You can power these generators:\n\n", .{});
         for (player.generators) |generator| {

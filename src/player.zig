@@ -82,6 +82,10 @@ pub const Player = struct {
         var map = std.AutoHashMap(Resource, u8).init(self.allocator);
 
         for (self.generators) |generator| {
+            if (generator.isEco()) {
+                continue;
+            }
+
             const current = try map.getOrPutValue(generator.resource, 0);
             _ = try map.put(generator.resource, current.value + 2 * generator.resource_count);
         }
@@ -338,4 +342,19 @@ test "player can determine if can power generators" {
 
     testing.expect(player.canPowerGenerator(Generator.init(4, 4, 1, Resource.Uranium)));
     testing.expect(!player.canPowerGenerator(Generator.init(5, 5, 5, Resource.Oil)));
+}
+
+test "player cannot store ecological resources" {
+    const player = Player{
+        .allocator = testing.allocator,
+        .name = "Player",
+        .resources = try std.mem.dupe(testing.allocator, Resource, &[_]Resource{}),
+        .generators = &[_]Generator{Generator.init(13, 1, 1, Resource.Wind)},
+        .cities = &[_]City{},
+    };
+
+    const can_store = try player.getStoreableResources();
+    defer can_store.deinit();
+
+    testing.expect(can_store.getValue(Resource.Wind) == null);
 }
