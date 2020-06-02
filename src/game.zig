@@ -17,7 +17,9 @@ const Market = @import("resource_market.zig").Market;
 const Player = player_mod.Player;
 const Resource = @import("resource.zig").Resource;
 
-fn getCitiesToShow(comptime T: type, count: T) []const u8 {
+/// If we're talking about multiple cities, then return the string "cities."
+/// Otherwise, return the string "city."
+pub fn getCitiesToShow(comptime T: type, count: T) []const u8 {
     if (count == 1) {
         return "city";
     }

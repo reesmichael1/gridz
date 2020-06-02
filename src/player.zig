@@ -4,6 +4,8 @@ const Allocator = std.mem.Allocator;
 
 const constants = @import("constants.zig");
 const gen_mod = @import("generator.zig");
+const input = @import("input.zig");
+const getCitiesToShow = @import("game.zig").getCitiesToShow;
 
 const City = @import("city.zig").City;
 const Generator = gen_mod.Generator;
@@ -64,15 +66,46 @@ pub const Player = struct {
         defer gens.deinit();
 
         if (self.generators.len == constants.max_gens) {
-            unreachable; // TODO: ask the player to remove a generator
-        }
+            const stdout = std.io.getStdOut().outStream();
+            try stdout.print("You have reached the maximum number of generators.\n", .{});
+            try stdout.print("You currently own these generators:\n\n", .{});
+            for (self.generators) |generator| {
+                try stdout.print("Generator {}: uses {} {} to power {} {}\n", .{
+                    generator.index,
+                    generator.resource_count,
+                    generator.resource,
+                    generator.can_power,
+                    getCitiesToShow(usize, generator.can_power),
+                });
+            }
 
-        for (self.generators) |generator| {
-            try gens.append(generator);
+            try stdout.print("\n", .{});
+
+            while (true) {
+                const remove_ix = try input.getNumberFromUser(u8, "Please enter the index of the generator you will discard: ", .{});
+
+                for (self.generators) |generator| {
+                    if (generator.index != remove_ix) {
+                        try gens.append(generator);
+                    }
+                }
+
+                if (gens.items.len == constants.max_gens) {
+                    try stdout.print("You do not own generator {}.\n", .{remove_ix});
+                    gens.deinit();
+                    gens = std.ArrayList(Generator).init(self.allocator);
+                } else {
+                    break;
+                }
+            }
+        } else {
+            for (self.generators) |generator| {
+                try gens.append(generator);
+            }
         }
 
         try gens.append(gen);
-        self.generators = try std.mem.dupe(self.allocator, Generator, gens.items);
+        self.generators = gens.toOwnedSlice();
         std.sort.sort(Generator, self.generators, gen_mod.genComp);
     }
 
