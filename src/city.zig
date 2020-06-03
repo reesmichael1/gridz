@@ -1,9 +1,9 @@
 const std = @import("std");
 const testing = std.testing;
 
-const constants = @import("constants.zig");
 const GameStage = @import("stage.zig").GameStage;
 const Player = @import("player.zig").Player;
+const Rules = @import("rules.zig").Rules;
 
 /// A City is a location that up to three Players can settle in.
 /// Cities are connected to each other as specified in the Board.
@@ -53,15 +53,15 @@ pub const City = struct {
     /// Calculate the cost of building in this City
     /// (not counting connection costs).
     /// Will panic if called in a city with no room left.
-    pub fn buildingCost(self: City) u8 {
+    pub fn buildingCost(self: City, rules: Rules) u8 {
         if (self.firstPlayer == null) {
-            return constants.first_city_cost;
+            return Rules.first_city_cost;
         } else if (self.secondPlayer == null) {
-            return constants.second_city_cost;
+            return Rules.second_city_cost;
         }
 
         std.debug.assert(self.thirdPlayer == null);
-        return constants.third_city_cost;
+        return Rules.third_city_cost;
     }
 
     pub fn addPlayer(self: *City, player: Player) void {
@@ -82,25 +82,26 @@ pub const City = struct {
 
 test "building capacities in the various stages" {
     var city = City.init("Test City", 1, 2);
+    const rules = Rules.init(2);
 
     testing.expect(city.canBuild(GameStage.Stage1));
     testing.expect(city.canBuild(GameStage.Stage2));
     testing.expect(city.canBuild(GameStage.Stage3));
-    testing.expectEqual(constants.first_city_cost, city.buildingCost());
+    testing.expectEqual(Rules.first_city_cost, city.buildingCost(rules));
 
     city.addPlayer(Player.init(testing.allocator, "Player 1"));
 
     testing.expect(!city.canBuild(GameStage.Stage1));
     testing.expect(city.canBuild(GameStage.Stage2));
     testing.expect(city.canBuild(GameStage.Stage3));
-    testing.expectEqual(constants.second_city_cost, city.buildingCost());
+    testing.expectEqual(Rules.second_city_cost, city.buildingCost(rules));
 
     city.addPlayer(Player.init(testing.allocator, "Player 2"));
 
     testing.expect(!city.canBuild(GameStage.Stage1));
     testing.expect(!city.canBuild(GameStage.Stage2));
     testing.expect(city.canBuild(GameStage.Stage3));
-    testing.expectEqual(constants.third_city_cost, city.buildingCost());
+    testing.expectEqual(Rules.third_city_cost, city.buildingCost(rules));
 
     city.addPlayer(Player.init(testing.allocator, "Player 3"));
 

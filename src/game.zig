@@ -2,7 +2,6 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const auction = @import("auction.zig");
-const constants = @import("constants.zig");
 const gen_mod = @import("generator.zig");
 const player_mod = @import("player.zig");
 const input = @import("input.zig");
@@ -16,6 +15,7 @@ const Loader = @import("loader.zig").Loader;
 const Market = @import("resource_market.zig").Market;
 const Player = player_mod.Player;
 const Resource = @import("resource.zig").Resource;
+const Rules = @import("rules.zig").Rules;
 
 /// If we're talking about multiple cities, then return the string "cities."
 /// Otherwise, return the string "city."
@@ -78,11 +78,13 @@ pub const Game = struct {
     stage: GameStage,
     /// Whether or not the game is over.
     has_ended: bool = false,
-    /// The current round of the game (starts at 1)
+    /// The current round of the game (starts at 1).
     round: u16,
+    /// The Rules under which the game is played.
+    rules: Rules,
     /// The RNG used for all game operations.
     rng: std.rand.Xoroshiro128,
-    /// The Allocator used for all allocations
+    /// The Allocator used for all allocations.
     allocator: *Allocator,
 
     /// Prepare the Game for the first turn.
@@ -92,12 +94,11 @@ pub const Game = struct {
         var rng = std.rand.DefaultPrng.init(@intCast(u64, std.time.milliTimestamp()));
         const generators = try loader.loadGenerators();
         const split = try splitGenerators(allocator, generators, &rng);
-
-        var players = try loader.loadPlayers();
+        const players = try loader.loadPlayers();
 
         return Game{
             .grid = try loader.loadGrid(),
-            .players = try loader.loadPlayers(),
+            .players = players,
             .gen_market = split[0],
             .future_gens = split[1],
             .hidden_generators = split[2],
@@ -105,6 +106,7 @@ pub const Game = struct {
             .resource_market = try loader.loadResourceMarket(),
             .stage = GameStage.Stage1,
             .rng = rng,
+            .rules = Rules.init(players.len),
             .round = 1,
             .allocator = allocator,
         };
@@ -447,7 +449,7 @@ pub const Game = struct {
                     // from the list of players eligible to buy a generator.
                     to_remove = purchase.buyer;
 
-                    try purchase.buyer.buyGenerator(purchase.gen, purchase.cost);
+                    try purchase.buyer.buyGenerator(purchase.gen, purchase.cost, self.rules);
 
                     // Update the generator markets by removing the purchased generator,
                     // replacing it with a generator from the stack,
@@ -557,14 +559,14 @@ pub const Game = struct {
         // Ask each utuplayer to choose how many cities they will power.
         for (self.players) |*player| {
             const cities_powered = try self.powerCities(player);
-            const earned = constants.getPaymentForCities(cities_powered);
+            const earned = self.rules.getPaymentForCities(cities_powered);
             try stdout.print("{}, you earned {} GZD.\n", .{ player.name, earned });
             player.money += earned;
         }
 
         // Refill the resource market.
         for ([_]Resource{ Resource.Coal, Resource.Oil, Resource.Garbage, Resource.Uranium }) |resource| {
-            const count = constants.getResourcesToRefill(self.stage, resource);
+            const count = self.rules.getResourcesToRefill(self.stage, resource);
             try self.resource_market.refillResource(resource, count);
         }
 
@@ -656,7 +658,7 @@ pub const Game = struct {
                     continue;
                 }
 
-                const build_cost = city.buildingCost();
+                const build_cost = city.buildingCost(self.rules);
                 const connection_cost = try self.grid.getMinConnectionCost(city.*, player.cities);
                 const total_cost = build_cost + connection_cost;
 
@@ -840,7 +842,7 @@ pub const Game = struct {
         }
 
         for (self.players) |player| {
-            if (player.cities.len >= constants.getStage2Trigger(self.players.len)) {
+            if (player.cities.len >= self.rules.stage2_trigger) {
                 self.stage = GameStage.Stage2;
                 return;
             }

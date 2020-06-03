@@ -2,7 +2,6 @@ const std = @import("std");
 const testing = std.testing;
 const Allocator = std.mem.Allocator;
 
-const constants = @import("constants.zig");
 const gen_mod = @import("generator.zig");
 const input = @import("input.zig");
 const getCitiesToShow = @import("game.zig").getCitiesToShow;
@@ -10,6 +9,7 @@ const getCitiesToShow = @import("game.zig").getCitiesToShow;
 const City = @import("city.zig").City;
 const Generator = gen_mod.Generator;
 const Resource = @import("resource.zig").Resource;
+const Rules = @import("rules.zig").Rules;
 
 /// A Player is a competitor in the game.
 pub const Player = struct {
@@ -59,13 +59,13 @@ pub const Player = struct {
 
     /// Actually perform the mechanics of buying a generator (i.e., deduct the cost
     /// from the player's cash reserves and add the generator to the player's inventory.)
-    pub fn buyGenerator(self: *Player, gen: Generator, cost: u64) !void {
+    pub fn buyGenerator(self: *Player, gen: Generator, cost: u64, rules: Rules) !void {
         self.money -= cost;
 
         var gens = std.ArrayList(Generator).init(self.allocator);
         defer gens.deinit();
 
-        if (self.generators.len == constants.max_gens) {
+        if (self.generators.len == rules.max_gens) {
             const stdout = std.io.getStdOut().outStream();
             try stdout.print("You have reached the maximum number of generators.\n", .{});
             try stdout.print("You currently own these generators:\n\n", .{});
@@ -90,7 +90,7 @@ pub const Player = struct {
                     }
                 }
 
-                if (gens.items.len == constants.max_gens) {
+                if (gens.items.len == rules.max_gens) {
                     try stdout.print("You do not own generator {}.\n", .{remove_ix});
                     gens.deinit();
                     gens = std.ArrayList(Generator).init(self.allocator);
