@@ -19,6 +19,21 @@ pub fn build(b: *Builder) void {
     const run_cmd = exe.run();
     run_cmd.step.dependOn(b.getInstallStep());
 
-    const run_step = b.step("run", "Run the app");
+    const run_step = b.step("run", "Start a new game");
     run_step.dependOn(&run_cmd.step);
+
+    const test_step = b.step("test", "Run the program tests");
+
+    // Add any files that contain tests to this list
+    const testable_files = [_][]const u8{
+        "src/city.zig",
+        "src/grid.zig",
+        "src/player.zig",
+        "src/resource_market.zig",
+    };
+
+    for (testable_files) |file| {
+        const file_tests = b.addTest(file);
+        test_step.dependOn(&file_tests.step);
+    }
 }
