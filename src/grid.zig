@@ -61,7 +61,6 @@ pub const Grid = struct {
         const row = self.connections[city_ix];
 
         var connections = std.ArrayList(City).init(self.allocator);
-        defer connections.deinit();
 
         for (row) |col, col_ix| {
             if (col != 0) {
@@ -69,7 +68,7 @@ pub const Grid = struct {
             }
         }
 
-        return std.mem.dupe(self.allocator, City, connections.items);
+        return connections.toOwnedSlice();
     }
 
     // TODO: change getConnections to return a slice of tuples of weights/cities.
@@ -227,7 +226,6 @@ fn loadTestGrid(allocator: *Allocator) !Grid {
     };
 
     var grid = std.ArrayList([]u8).init(allocator);
-    defer grid.deinit();
 
     for (adjacency) |row| {
         var rowList = std.ArrayList(u8).init(allocator);
@@ -242,7 +240,7 @@ fn loadTestGrid(allocator: *Allocator) !Grid {
     return Grid{
         .allocator = allocator,
         .cities = try std.mem.dupe(allocator, City, cities),
-        .connections = try std.mem.dupe(allocator, []u8, grid.items),
+        .connections = grid.toOwnedSlice(),
     };
 }
 

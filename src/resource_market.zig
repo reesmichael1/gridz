@@ -106,7 +106,7 @@ pub const Market = struct {
 
         return Market{
             .allocator = allocator,
-            .blocks = try std.mem.dupe(allocator, Block, blocks.items),
+            .blocks = blocks.toOwnedSlice(),
         };
     }
 

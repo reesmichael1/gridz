@@ -47,14 +47,13 @@ pub const Player = struct {
     pub fn buyResource(self: *Player, resource: Resource, count: u64) !void {
         var added: u64 = 0;
         var resources = std.ArrayList(Resource).init(self.allocator);
-        defer resources.deinit();
         try resources.appendSlice(self.resources);
 
         while (added < count) : (added += 1) {
             try resources.append(resource);
         }
 
-        self.resources = try std.mem.dupe(self.allocator, Resource, resources.items);
+        self.resources = resources.toOwnedSlice();
     }
 
     /// Actually perform the mechanics of buying a generator (i.e., deduct the cost
@@ -63,7 +62,6 @@ pub const Player = struct {
         self.money -= cost;
 
         var gens = std.ArrayList(Generator).init(self.allocator);
-        defer gens.deinit();
 
         if (self.generators.len == rules.max_gens) {
             const stdout = std.io.getStdOut().outStream();
@@ -168,7 +166,7 @@ pub const Player = struct {
         }
 
         self.allocator.free(self.resources);
-        self.resources = try std.mem.dupe(self.allocator, Resource, resources.items);
+        self.resources = resources.toOwnedSlice();
     }
 };
 

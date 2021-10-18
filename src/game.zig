@@ -578,10 +578,7 @@ pub const Game = struct {
         }
 
         var reserve_gens = std.ArrayList(Generator).init(self.allocator);
-        defer reserve_gens.deinit();
-
         var current_gens = std.ArrayList(Generator).init(self.allocator);
-        defer current_gens.deinit();
 
         try reserve_gens.appendSlice(self.reserve_gens);
         try reserve_gens.append(self.future_gens[self.future_gens.len - 1]);
@@ -592,8 +589,8 @@ pub const Game = struct {
         try current_gens.append(self.hidden_generators[0]);
         self.hidden_generators = self.hidden_generators[1..];
 
-        try self.updateGenMarket(try std.mem.dupe(self.allocator, Generator, current_gens.items));
-        self.reserve_gens = try std.mem.dupe(self.allocator, Generator, reserve_gens.items);
+        try self.updateGenMarket(current_gens.toOwnedSlice());
+        self.reserve_gens = reserve_gens.toOwnedSlice();
 
         try stdout.print("\n", .{});
     }
