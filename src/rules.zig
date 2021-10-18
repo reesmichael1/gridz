@@ -6,9 +6,9 @@ const Resource = @import("resource.zig").Resource;
 /// Rules keeps track of the constants of the game,
 /// some of which are set depending on the number of players.
 pub const Rules = struct {
-    pub const first_city_cost: u8 = 10;
-    pub const second_city_cost: u8 = 15;
-    pub const third_city_cost: u8 = 20;
+    first_city_cost: u8 = 10,
+    second_city_cost: u8 = 15,
+    third_city_cost: u8 = 20,
 
     gens_removed: u8 = 8,
     game_end_gens: u8 = 17,
@@ -48,7 +48,7 @@ pub const Rules = struct {
 
     /// Get how much money should be paid to a player
     /// based on how many cities they powered this round.
-    pub fn getPaymentForCities(self: Rules, cities: u8) u64 {
+    pub fn getPaymentForCities(_: Rules, cities: u8) u64 {
         switch (cities) {
             0 => return 10,
             1 => return 22,
@@ -78,7 +78,7 @@ pub const Rules = struct {
     // TODO: limit total resources available in the game
     /// Get the number of a resource that should be put back into the market
     /// depending on the current game state.
-    pub fn getResourcesToRefill(self: Rules, stage: GameStage, resource: Resource) u8 {
+    pub fn getResourcesToRefill(_: Rules, stage: GameStage, resource: Resource) u8 {
         switch (stage) {
             GameStage.Stage1 => {
                 switch (resource) {

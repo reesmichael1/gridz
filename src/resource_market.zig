@@ -198,10 +198,10 @@ test "buying coal from first block" {
     var market = try Market.init(testing.allocator);
     defer market.deinit();
 
-    std.testing.expectEqual(@as(u64, 2), try market.costOfResources(Resource.Coal, 2));
+    try std.testing.expectEqual(@as(u64, 2), try market.costOfResources(Resource.Coal, 2));
 
     market.buyResource(Resource.Coal, 2);
-    std.testing.expectEqual(@as(u64, 1), market.blocks[0].resources[0].count_filled);
+    try std.testing.expectEqual(@as(u64, 1), market.blocks[0].resources[0].count_filled);
 }
 
 test "buying coal across two blocks" {
@@ -209,27 +209,27 @@ test "buying coal across two blocks" {
     defer market.deinit();
 
     const expected_cost: u64 = 5;
-    std.testing.expectEqual(expected_cost, try market.costOfResources(Resource.Coal, 4));
+    try std.testing.expectEqual(expected_cost, try market.costOfResources(Resource.Coal, 4));
 
     market.buyResource(Resource.Coal, 4);
-    std.testing.expectEqual(@as(u64, 0), market.blocks[0].resources[0].count_filled);
-    std.testing.expectEqual(@as(u64, 2), market.blocks[1].resources[0].count_filled);
+    try std.testing.expectEqual(@as(u64, 0), market.blocks[0].resources[0].count_filled);
+    try std.testing.expectEqual(@as(u64, 2), market.blocks[1].resources[0].count_filled);
 }
 
 test "buying oil from first available block" {
     var market = try Market.init(testing.allocator);
     defer market.deinit();
     const expected_cost: u64 = 3;
-    std.testing.expectEqual(expected_cost, try market.costOfResources(Resource.Oil, 1));
+    try std.testing.expectEqual(expected_cost, try market.costOfResources(Resource.Oil, 1));
 
     market.buyResource(Resource.Oil, 1);
-    std.testing.expectEqual(@as(u64, 2), market.blocks[2].resources[1].count_filled);
+    try std.testing.expectEqual(@as(u64, 2), market.blocks[2].resources[1].count_filled);
 }
 
 test "buying too many resources from the market fails" {
     var market = try Market.init(testing.allocator);
     defer market.deinit();
-    std.testing.expectError(error.NotEnoughResources, market.costOfResources(Resource.Coal, 100));
+    try std.testing.expectError(error.NotEnoughResources, market.costOfResources(Resource.Coal, 100));
 }
 
 test "refilling resources in first block works" {
@@ -238,7 +238,7 @@ test "refilling resources in first block works" {
 
     market.buyResource(Resource.Coal, 3);
     try market.refillResource(Resource.Coal, 2);
-    std.testing.expectEqual(@as(u64, 2), market.blocks[0].resources[0].count_filled);
+    try std.testing.expectEqual(@as(u64, 2), market.blocks[0].resources[0].count_filled);
 }
 
 test "refilling resources across blocks works" {
@@ -247,31 +247,31 @@ test "refilling resources across blocks works" {
 
     market.buyResource(Resource.Coal, 5);
     try market.refillResource(Resource.Coal, 3);
-    std.testing.expectEqual(@as(u64, 1), market.blocks[0].resources[0].count_filled);
-    std.testing.expectEqual(@as(u64, 3), market.blocks[1].resources[0].count_filled);
+    try std.testing.expectEqual(@as(u64, 1), market.blocks[0].resources[0].count_filled);
+    try std.testing.expectEqual(@as(u64, 3), market.blocks[1].resources[0].count_filled);
 }
 
 test "refilling resources multiple blocks in works" {
     var market = try Market.init(testing.allocator);
     defer market.deinit();
 
-    std.testing.expectEqual(@as(u64, 0), market.blocks[1].resources[1].count_filled);
+    try std.testing.expectEqual(@as(u64, 0), market.blocks[1].resources[1].count_filled);
     try market.refillResource(Resource.Oil, 2);
-    std.testing.expectEqual(@as(u64, 2), market.blocks[1].resources[1].count_filled);
+    try std.testing.expectEqual(@as(u64, 2), market.blocks[1].resources[1].count_filled);
 }
 
 test "refilling too many resources does nothing" {
     var market = try Market.init(testing.allocator);
     defer market.deinit();
 
-    std.testing.expectEqual(@as(u64, 0), market.blocks[0].resources[3].count_filled);
+    try std.testing.expectEqual(@as(u64, 0), market.blocks[0].resources[3].count_filled);
     try market.refillResource(Resource.Uranium, 20);
-    std.testing.expectEqual(@as(u64, 1), market.blocks[0].resources[3].count_filled);
+    try std.testing.expectEqual(@as(u64, 1), market.blocks[0].resources[3].count_filled);
 }
 
 test "can buy zero resources" {
     var market = try Market.init(testing.allocator);
     defer market.deinit();
 
-    std.testing.expectEqual(@as(u64, 0), try market.costOfResources(Resource.Coal, 0));
+    try std.testing.expectEqual(@as(u64, 0), try market.costOfResources(Resource.Coal, 0));
 }

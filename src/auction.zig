@@ -23,11 +23,11 @@ pub const AuctionResult = union(AuctionResultTag) {
     Passed: *Player,
 };
 
-pub fn getBidFromPlayer(player: *const Player, generator: Generator, min: u64) !u64 {
-    const stdout = std.io.getStdOut().outStream();
+pub fn getBidFromPlayer(player: *const Player, min: u64) !u64 {
+    const stdout = std.io.getStdOut().writer();
 
     while (true) {
-        const bid = try input.getNumberFromUser(u64, "{}, please enter your bid. ", .{player.name});
+        const bid = try input.getNumberFromUser(u64, "{s}, please enter your bid. ", .{player.name});
 
         if (bid < min) {
             try stdout.print("Bid must be at least {}.\n", .{min});
@@ -47,12 +47,11 @@ pub fn getBidFromPlayer(player: *const Player, generator: Generator, min: u64) !
 /// eligible_players contains pointers to all of the player who can still bid,
 /// and should be in the bidding order (with the first player at index 0).
 pub fn auctionRound(game: *Game, eligible_players: []*Player, generators: []Generator, must_buy: bool) !AuctionResult {
-    const stdout = std.io.getStdOut().outStream();
-    const stdin = std.io.getStdIn();
+    const stdout = std.io.getStdOut().writer();
 
     const starter = eligible_players[0];
 
-    try stdout.print("{}, you have {} GZD.\n", .{ starter.name, starter.money });
+    try stdout.print("{s}, you have {} GZD.\n", .{ starter.name, starter.money });
 
     if (must_buy) {
         try stdout.print("You must buy a generator this round.\n", .{});
@@ -85,7 +84,7 @@ pub fn auctionRound(game: *Game, eligible_players: []*Player, generators: []Gene
     // Actually collect the bids for the generator.
     const generator = selected.?;
     var min_bid = generator.index;
-    var highest_bid: u64 = try getBidFromPlayer(starter, generator, min_bid);
+    var highest_bid: u64 = try getBidFromPlayer(starter, min_bid);
 
     if (eligible_players.len == 1) {
         const result = PurchasedGen{
@@ -105,7 +104,7 @@ pub fn auctionRound(game: *Game, eligible_players: []*Player, generators: []Gene
     while (purchaser == null) {
         var bidder = eligible_players[bidder_ix];
 
-        while (has_passed.exists(bidder.name)) {
+        while (has_passed.contains(bidder.name)) {
             bidder_ix += 1;
             if (bidder_ix == eligible_players.len) {
                 bidder_ix = 0;
@@ -118,13 +117,13 @@ pub fn auctionRound(game: *Game, eligible_players: []*Player, generators: []Gene
             break;
         }
 
-        const bids_again = try input.askYesOrNo("{}, do you want to raise the bid? [y/n] ", .{bidder.name});
+        const bids_again = try input.askYesOrNo("{s}, do you want to raise the bid? [y/n] ", .{bidder.name});
 
         if (!bids_again) {
-            try has_passed.put(bidder.name);
+            try has_passed.insert(bidder.name);
         } else {
             highest_bidder = bidder;
-            highest_bid = try getBidFromPlayer(bidder, generator, highest_bid + 1);
+            highest_bid = try getBidFromPlayer(bidder, highest_bid + 1);
         }
 
         bidder_ix += 1;

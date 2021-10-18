@@ -12,9 +12,9 @@ pub const Resource = enum {
 
     pub fn format(
         self: Resource,
-        comptime fmt: []const u8,
-        options: std.fmt.FormatOptions,
-        out_stream: var,
+        comptime _: []const u8,
+        _: std.fmt.FormatOptions,
+        out_stream: anytype,
     ) !void {
         switch (self) {
             Resource.Coal => return std.fmt.format(out_stream, "Coal", .{}),

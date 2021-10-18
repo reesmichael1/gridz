@@ -64,11 +64,11 @@ pub const Player = struct {
         var gens = std.ArrayList(Generator).init(self.allocator);
 
         if (self.generators.len == rules.max_gens) {
-            const stdout = std.io.getStdOut().outStream();
+            const stdout = std.io.getStdOut().writer();
             try stdout.print("You have reached the maximum number of generators.\n", .{});
             try stdout.print("You currently own these generators:\n\n", .{});
             for (self.generators) |generator| {
-                try stdout.print("Generator {}: uses {} {} to power {} {}\n", .{
+                try stdout.print("Generator {}: uses {} {} to power {} {s}\n", .{
                     generator.index,
                     generator.resource_count,
                     generator.resource,
@@ -104,7 +104,7 @@ pub const Player = struct {
 
         try gens.append(gen);
         self.generators = gens.toOwnedSlice();
-        std.sort.sort(Generator, self.generators, gen_mod.genComp);
+        std.sort.sort(Generator, self.generators, {}, gen_mod.genComp);
     }
 
     /// Return a hash map of each resource the player can store -> how many can be stored.
@@ -118,12 +118,12 @@ pub const Player = struct {
             }
 
             const current = try map.getOrPutValue(generator.resource, 0);
-            _ = try map.put(generator.resource, current.value + 2 * generator.resource_count);
+            _ = try map.put(generator.resource, current.value_ptr.* + 2 * generator.resource_count);
         }
 
         for (self.resources) |resource| {
             const current = try map.getOrPutValue(resource, 0);
-            _ = try map.put(resource, current.value - 1);
+            _ = try map.put(resource, current.value_ptr.* - 1);
         }
 
         return map;
@@ -174,7 +174,7 @@ pub const Player = struct {
 /// If one player has more cities than another,
 /// then they should go first. Otherwise, the player
 /// with the higher numbered generator goes first.
-pub fn playerComp(player1: Player, player2: Player) bool {
+pub fn playerComp(_: void, player1: Player, player2: Player) bool {
     if (player1.cities.len != player2.cities.len) {
         return player1.cities.len > player2.cities.len;
     }
@@ -211,9 +211,9 @@ test "determine turn order" {
     };
 
     var players = &[_]Player{ playerSecond, playerThird, playerFirst };
-    std.sort.sort(Player, players, playerComp);
+    std.sort.sort(Player, players, {}, playerComp);
 
-    testing.expectEqualSlices(Player, players, &[_]Player{ playerFirst, playerSecond, playerThird });
+    try testing.expectEqualSlices(Player, players, &[_]Player{ playerFirst, playerSecond, playerThird });
 }
 
 test "turn order entirely on cities" {
@@ -242,9 +242,9 @@ test "turn order entirely on cities" {
     };
 
     var players = &[_]Player{ playerThird, playerSecond, playerFirst };
-    std.sort.sort(Player, players, playerComp);
+    std.sort.sort(Player, players, {}, playerComp);
 
-    testing.expectEqualSlices(Player, players, &[_]Player{ playerFirst, playerSecond, playerThird });
+    try testing.expectEqualSlices(Player, players, &[_]Player{ playerFirst, playerSecond, playerThird });
 }
 
 test "turn order entirely on generators" {
@@ -273,9 +273,9 @@ test "turn order entirely on generators" {
     };
 
     var players = &[_]Player{ playerThird, playerSecond, playerFirst };
-    std.sort.sort(Player, players, playerComp);
+    std.sort.sort(Player, players, {}, playerComp);
 
-    testing.expectEqualSlices(Player, players, &[_]Player{ playerFirst, playerSecond, playerThird });
+    try testing.expectEqualSlices(Player, players, &[_]Player{ playerFirst, playerSecond, playerThird });
 }
 
 test "player can store single resource" {
@@ -287,10 +287,10 @@ test "player can store single resource" {
         .resources = &[_]Resource{},
     };
 
-    const can_store = try playerWithCoal.getStoreableResources();
+    var can_store = try playerWithCoal.getStoreableResources();
     defer can_store.deinit();
 
-    testing.expect(can_store.getValue(Resource.Coal).? == 4);
+    try testing.expect(can_store.get(Resource.Coal).? == 4);
 }
 
 test "player can store multiple resources" {
@@ -305,11 +305,11 @@ test "player can store multiple resources" {
         .resources = &[_]Resource{},
     };
 
-    const can_store = try playerWithCoalAndOil.getStoreableResources();
+    var can_store = try playerWithCoalAndOil.getStoreableResources();
     defer can_store.deinit();
 
-    testing.expect(can_store.getValue(Resource.Coal).? == 4);
-    testing.expect(can_store.getValue(Resource.Oil).? == 6);
+    try testing.expect(can_store.get(Resource.Coal).? == 4);
+    try testing.expect(can_store.get(Resource.Oil).? == 6);
 }
 
 test "player can store same resource across multiple generators" {
@@ -324,10 +324,10 @@ test "player can store same resource across multiple generators" {
         .resources = &[_]Resource{},
     };
 
-    const can_store = try playerWithTwoCoal.getStoreableResources();
+    var can_store = try playerWithTwoCoal.getStoreableResources();
     defer can_store.deinit();
 
-    testing.expect(can_store.getValue(Resource.Coal).? == 10);
+    try testing.expect(can_store.get(Resource.Coal).? == 10);
 }
 
 test "player with existing resources can buy fewer resources" {
@@ -343,10 +343,10 @@ test "player with existing resources can buy fewer resources" {
         .resources = &resources,
     };
 
-    const can_store = try playerWithTwoCoal.getStoreableResources();
+    var can_store = try playerWithTwoCoal.getStoreableResources();
     defer can_store.deinit();
 
-    testing.expect(can_store.getValue(Resource.Coal).? == 8);
+    try testing.expect(can_store.get(Resource.Coal).? == 8);
 }
 
 test "player can determine if can power generators" {
@@ -364,15 +364,15 @@ test "player can determine if can power generators" {
 
     defer player.deinit();
 
-    testing.expect(player.canPowerGenerator(Generator.init(1, 1, 1, Resource.Coal)));
-    testing.expect(player.canPowerGenerator(Generator.init(2, 2, 2, Resource.Coal)));
-    testing.expect(!player.canPowerGenerator(Generator.init(3, 3, 3, Resource.Coal)));
+    try testing.expect(player.canPowerGenerator(Generator.init(1, 1, 1, Resource.Coal)));
+    try testing.expect(player.canPowerGenerator(Generator.init(2, 2, 2, Resource.Coal)));
+    try testing.expect(!player.canPowerGenerator(Generator.init(3, 3, 3, Resource.Coal)));
 
     try player.powerGenerator(Generator.init(2, 2, 2, Resource.Coal));
-    std.testing.expectEqualSlices(Resource, &[_]Resource{Resource.Uranium}, player.resources);
+    try std.testing.expectEqualSlices(Resource, &[_]Resource{Resource.Uranium}, player.resources);
 
-    testing.expect(player.canPowerGenerator(Generator.init(4, 4, 1, Resource.Uranium)));
-    testing.expect(!player.canPowerGenerator(Generator.init(5, 5, 5, Resource.Oil)));
+    try testing.expect(player.canPowerGenerator(Generator.init(4, 4, 1, Resource.Uranium)));
+    try testing.expect(!player.canPowerGenerator(Generator.init(5, 5, 5, Resource.Oil)));
 }
 
 test "player cannot store ecological resources" {
@@ -384,8 +384,8 @@ test "player cannot store ecological resources" {
         .cities = &[_]City{},
     };
 
-    const can_store = try player.getStoreableResources();
+    var can_store = try player.getStoreableResources();
     defer can_store.deinit();
 
-    testing.expect(can_store.getValue(Resource.Wind) == null);
+    try testing.expect(can_store.get(Resource.Wind) == null);
 }

@@ -8,7 +8,7 @@ const Market = @import("resource_market.zig").Market;
 const Player = @import("player.zig").Player;
 const Resource = @import("resource.zig").Resource;
 
-fn buildAdjacencyMatrix(allocator: *Allocator, cities: []City) ![][]u8 {
+fn buildAdjacencyMatrix(allocator: *Allocator, _: []City) ![][]u8 {
     // Eventually, this will be generated from the list of cities,
     // but for now, let's hardcode it.
     // This matrix corresponds to the layout in maps/default.graphml.

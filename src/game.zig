@@ -32,9 +32,7 @@ pub fn getCitiesToShow(comptime T: type, count: T) []const u8 {
 ///     2. the future generator market
 ///     3. the generators remaining in the stack, not yet revealed
 /// The initial list gens MUST be sorted by generator index.
-fn splitGenerators(allocator: *Allocator, gens: []Generator, r: *std.rand.Xoroshiro128) ![3][]Generator {
-    const seed = std.time.milliTimestamp();
-
+fn splitGenerators(allocator: *Allocator, gens: []Generator, r: *std.rand.Xoshiro256) ![3][]Generator {
     var eco = gens[10];
 
     var hidden_a = gens[8..10];
@@ -54,7 +52,7 @@ fn splitGenerators(allocator: *Allocator, gens: []Generator, r: *std.rand.Xorosh
 /// Print an integer into a row of the buffer, starting at an x coordinate.
 fn printNumberAtCoord(comptime T: type, buf: []u8, num: T, x: u64) void {
     const digits = @floatToInt(u8, @floor(@log10(@intToFloat(f32, num)))) + 1;
-    _ = std.fmt.formatIntBuf(buf[x .. x + digits], num, 10, false, std.fmt.FormatOptions{});
+    _ = std.fmt.formatIntBuf(buf[x .. x + digits], num, 10, .lower, std.fmt.FormatOptions{});
 }
 
 /// A Game is the main object for the game and its state.
@@ -83,7 +81,7 @@ pub const Game = struct {
     /// The Rules under which the game is played.
     rules: Rules,
     /// The RNG used for all game operations.
-    rng: std.rand.Xoroshiro128,
+    rng: std.rand.Xoshiro256,
     /// The Allocator used for all allocations.
     allocator: *Allocator,
 
@@ -143,11 +141,11 @@ pub const Game = struct {
 
     /// Display the current game state for the players to see.
     fn updateDisplay(self: Game) !void {
-        const stdout = std.io.getStdOut().outStream();
+        const stdout = std.io.getStdOut().writer();
 
         try stdout.print("Player order for turn {}:\n", .{self.round});
         for (self.players) |player, ix| {
-            try stdout.print("{}: {} ({} GZD)\n", .{ ix + 1, player.name, player.money });
+            try stdout.print("{}: {s} ({} GZD)\n", .{ ix + 1, player.name, player.money });
         }
 
         try self.displayMap();
@@ -156,8 +154,6 @@ pub const Game = struct {
 
     /// Display the cities, their connections, and where players have built.
     fn displayMap(self: Game) !void {
-        const col_offset = 4;
-        const diag_offset = 2;
         const box_width = 14;
         const box_height = 5;
         const rows = 5;
@@ -178,7 +174,7 @@ pub const Game = struct {
             }
         }
 
-        const stdout = std.io.getStdOut().outStream();
+        const stdout = std.io.getStdOut().writer();
         try stdout.print("\n\n", .{});
 
         for (self.grid.cities) |city| {
@@ -316,17 +312,17 @@ pub const Game = struct {
         }
 
         for (buf) |row| {
-            try stdout.print("{}\n", .{row});
+            try stdout.print("{s}\n", .{row});
         }
     }
 
     /// Display the generators in the current and future markets.
     fn displayGenerators(self: Game) !void {
-        const stdout = std.io.getStdOut().outStream();
+        const stdout = std.io.getStdOut().writer();
         try stdout.print("\n\nGenerators available:\n", .{});
 
         for (self.gen_market) |generator| {
-            try stdout.print("{}: uses {} {} to power {} {}\n", .{
+            try stdout.print("{}: uses {} {} to power {} {s}\n", .{
                 generator.index,
                 generator.resource_count,
                 generator.resource,
@@ -337,7 +333,7 @@ pub const Game = struct {
 
         try stdout.print("\n\nGenerators in future market:\n", .{});
         for (self.future_gens) |generator| {
-            try stdout.print("{}: uses {} {} to power {} {}\n", .{
+            try stdout.print("{}: uses {} {} to power {} {s}\n", .{
                 generator.index,
                 generator.resource_count,
                 generator.resource,
@@ -351,7 +347,7 @@ pub const Game = struct {
 
     /// Display the resources available for the players to purchase.
     fn displayResourceMarket(self: Game) !void {
-        const stdout = std.io.getStdOut().outStream();
+        const stdout = std.io.getStdOut().writer();
 
         // Display each resource box in a 3 x 4 grid
         const box_width = 14;
@@ -411,7 +407,7 @@ pub const Game = struct {
         try stdout.print("Resources available:\n", .{});
 
         for (buf) |row| {
-            try stdout.print("{}\n", .{row});
+            try stdout.print("{s}\n", .{row});
         }
 
         try stdout.print("\n", .{});
@@ -425,7 +421,7 @@ pub const Game = struct {
         if (random) {
             self.rng.random.shuffle(Player, self.players);
         } else {
-            std.sort.sort(Player, self.players, player_mod.playerComp);
+            std.sort.sort(Player, self.players, {}, player_mod.playerComp);
         }
     }
 
@@ -538,8 +534,6 @@ pub const Game = struct {
 
     /// Allow the players to build in the various cities.
     fn phase4(self: *Game) !void {
-        const stdout = std.io.getStdOut().outStream();
-
         var player_ix: usize = self.players.len - 1;
 
         while (player_ix >= 0) : (player_ix -= 1) {
@@ -554,13 +548,13 @@ pub const Game = struct {
     /// Take care of all of the business at the end of each turn,
     /// and determine if the game should move to a new stage or is over.
     fn phase5(self: *Game) !void {
-        const stdout = std.io.getStdOut().outStream();
+        const stdout = std.io.getStdOut().writer();
 
         // Ask each utuplayer to choose how many cities they will power.
         for (self.players) |*player| {
             const cities_powered = try self.powerCities(player);
             const earned = self.rules.getPaymentForCities(cities_powered);
-            try stdout.print("{}, you earned {} GZD.\n", .{ player.name, earned });
+            try stdout.print("{s}, you earned {} GZD.\n", .{ player.name, earned });
             player.money += earned;
         }
 
@@ -597,7 +591,7 @@ pub const Game = struct {
 
     fn buildCities(self: *Game, player: *Player) !void {
         var built: usize = 0;
-        const stdout = std.io.getStdOut().outStream();
+        const stdout = std.io.getStdOut().writer();
 
         while (true) {
             try self.displayMap();
@@ -608,14 +602,14 @@ pub const Game = struct {
                 can_power += gen.can_power;
             }
 
-            try stdout.print("{}, you have {} GZD and have enough generators to power {} {}.\n", .{
+            try stdout.print("{s}, you have {} GZD and have enough generators to power {} {s}.\n", .{
                 player.name,
                 player.money,
                 can_power,
                 getCitiesToShow(u64, can_power),
             });
 
-            try stdout.print("You currently have {} {}. ", .{
+            try stdout.print("You currently have {} {s}. ", .{
                 player.cities.len,
                 getCitiesToShow(usize, player.cities.len),
             });
@@ -639,19 +633,19 @@ pub const Game = struct {
 
                 // Verify that the city given exists and this player can build in it.
                 const city = self.grid.findCityByName(name) orelse {
-                    try stdout.print("There is no city called {}.\n", .{name});
+                    try stdout.print("There is no city called {s}.\n", .{name});
                     continue;
                 };
 
                 for (player.cities) |owned_city| {
                     if (owned_city.eq(city.*)) {
-                        try stdout.print("You have already built in {}!\n", .{city.name});
+                        try stdout.print("You have already built in {s}!\n", .{city.name});
                         continue :choose_city;
                     }
                 }
 
                 if (!city.canBuild(self.stage)) {
-                    try stdout.print("There isn't room in {} to build.\n", .{city.name});
+                    try stdout.print("There isn't room in {s} to build.\n", .{city.name});
                     continue;
                 }
 
@@ -660,7 +654,7 @@ pub const Game = struct {
                 const total_cost = build_cost + connection_cost;
 
                 if (total_cost > player.money) {
-                    try stdout.print("You don't have enough money to build in {}.\n", .{city.name});
+                    try stdout.print("You don't have enough money to build in {s}.\n", .{city.name});
                     break;
                 }
 
@@ -688,8 +682,8 @@ pub const Game = struct {
     }
 
     fn buyResources(self: *Game, player: *Player) !void {
-        const stdout = std.io.getStdOut().outStream();
-        const can_store = try player.getStoreableResources();
+        const stdout = std.io.getStdOut().writer();
+        var can_store = try player.getStoreableResources();
         defer can_store.deinit();
 
         var it = can_store.iterator();
@@ -697,33 +691,33 @@ pub const Game = struct {
             var to_buy: u8 = 0;
             var cost: u64 = 0;
 
-            if (resource.value == 0) {
+            if (resource.value_ptr.* == 0) {
                 continue;
             }
 
-            try stdout.print("{}, you have {} GZD.\n", .{ player.name, player.money });
+            try stdout.print("{s}, you have {} GZD.\n", .{ player.name, player.money });
 
             while (true) {
                 to_buy = try input.getNumberFromUser(u8, "You can store up to {} {}. How many would you like to buy? ", .{
-                    resource.value,
-                    resource.key,
+                    resource.value_ptr.*,
+                    resource.key_ptr.*,
                 });
 
-                if (to_buy > resource.value) {
+                if (to_buy > resource.value_ptr.*) {
                     try stdout.print("You can store at most {} {}.\n", .{
-                        resource.value,
-                        resource.key,
+                        resource.value_ptr.*,
+                        resource.key_ptr.*,
                     });
                     continue;
                 }
 
-                cost = self.resource_market.costOfResources(resource.key, to_buy) catch |err| {
+                cost = self.resource_market.costOfResources(resource.key_ptr.*, to_buy) catch {
                     try stdout.print("The market doesn't have that many resources available.\n", .{});
                     continue;
                 };
 
                 if (cost > player.money) {
-                    try stdout.print("You can't afford to buy that many {}.\n", .{resource.key});
+                    try stdout.print("You can't afford to buy that many {}.\n", .{resource.key_ptr.*});
                     continue;
                 }
 
@@ -737,23 +731,23 @@ pub const Game = struct {
                 }
             }
 
-            self.resource_market.buyResource(resource.key, to_buy);
-            try player.buyResource(resource.key, to_buy);
+            self.resource_market.buyResource(resource.key_ptr.*, to_buy);
+            try player.buyResource(resource.key_ptr.*, to_buy);
             player.money -= cost;
         }
 
         try stdout.print("\n", .{});
     }
 
-    fn powerCities(self: Game, player: *Player) !u8 {
-        const stdout = std.io.getStdIn().outStream();
+    fn powerCities(_: Game, player: *Player) !u8 {
+        const stdout = std.io.getStdOut().writer();
 
         if (player.cities.len == 0) {
-            try stdout.print("{}, you don't have any cities to power.\n", .{player.name});
+            try stdout.print("{s}, you don't have any cities to power.\n", .{player.name});
             return 0;
         }
 
-        try stdout.print("\n{}, you have {} {}. ", .{
+        try stdout.print("\n{s}, you have {} {s}. ", .{
             player.name,
             player.cities.len,
             getCitiesToShow(usize, player.cities.len),
@@ -770,7 +764,7 @@ pub const Game = struct {
                 continue;
             }
 
-            try stdout.print("Generator {}: uses {} {} to power {} {}\n", .{
+            try stdout.print("Generator {}: uses {} {} to power {} {s}\n", .{
                 generator.index,
                 generator.resource_count,
                 generator.resource,
@@ -790,7 +784,7 @@ pub const Game = struct {
         }
 
         if (powered != 0) {
-            try stdout.print("You can already power {} {} with your ecological generators.\n", .{
+            try stdout.print("You can already power {} {s} with your ecological generators.\n", .{
                 powered,
                 getCitiesToShow(u8, powered),
             });
@@ -802,7 +796,7 @@ pub const Game = struct {
 
         for (player.generators) |generator| {
             if (player.canPowerGenerator(generator)) {
-                const will_power = try input.askYesOrNo("Would you like to power {} {} with generator {} for {} {}? [y/n] ", .{
+                const will_power = try input.askYesOrNo("Would you like to power {} {s} with generator {} for {} {}? [y/n] ", .{
                     generator.can_power,
                     getCitiesToShow(u8, generator.can_power),
                     generator.index,
@@ -826,7 +820,7 @@ pub const Game = struct {
 
     /// Assign generators into current and future markets in the correct order.
     fn updateGenMarket(self: *Game, gens: []Generator) !void {
-        std.sort.sort(Generator, gens, gen_mod.genComp);
+        std.sort.sort(Generator, gens, {}, gen_mod.genComp);
 
         self.gen_market = gens[0..4];
         self.future_gens = gens[4..];

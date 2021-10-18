@@ -128,49 +128,49 @@ pub const Grid = struct {
         var cities_by_name = std.StringHashMap(City).init(self.allocator);
         defer cities_by_name.deinit();
 
-        var distances = std.AutoHashMap(City, u64).init(self.allocator);
+        var distances = std.StringHashMap(u64).init(self.allocator);
         defer distances.deinit();
 
         for (self.cities) |node| {
-            try unvisited.put(node.name);
-            _ = try distances.put(node, std.math.maxInt(u64));
+            try unvisited.insert(node.name);
+            _ = try distances.put(node.name, std.math.maxInt(u64));
             _ = try cities_by_name.put(node.name, node);
         }
 
-        _ = try distances.put(city, 0);
+        _ = try distances.put(city.name, 0);
 
         var current_node = city;
 
         while (unvisited.count() > 0) {
-            const current_distance = distances.getValue(current_node).?;
+            const current_distance = distances.get(current_node.name).?;
             const connections = try self.getConnections(current_node);
             defer self.allocator.free(connections);
 
             for (connections) |connection| {
-                if (!unvisited.exists(connection.name)) {
+                if (!unvisited.contains(connection.name)) {
                     continue;
                 }
 
-                const connection_value = distances.getValue(connection).?;
+                const connection_value = distances.get(connection.name).?;
                 const connection_weight = self.getWeight(current_node, connection).?;
                 const new_weight = current_distance + connection_weight;
                 if (connection_value > new_weight) {
-                    _ = try distances.put(connection, new_weight);
+                    _ = try distances.put(connection.name, new_weight);
                 }
             }
 
-            unvisited.delete(current_node.name);
+            unvisited.remove(current_node.name);
 
             var next: ?City = null;
             var it = unvisited.iterator();
             while (true) {
                 const entry = it.next() orelse break;
-                const next_unvisited = cities_by_name.getValue(entry.key).?;
+                const next_unvisited = cities_by_name.get(entry.*).?;
                 if (next == null) {
                     next = next_unvisited;
                     continue;
                 }
-                if (distances.getValue(next_unvisited).? < distances.getValue(next.?).?) {
+                if (distances.get(next_unvisited.name).? < distances.get(next.?.name).?) {
                     next = next_unvisited;
                 }
             }
@@ -183,9 +183,9 @@ pub const Grid = struct {
             }
         }
 
-        var min = distances.getValue(network[0]).?;
+        var min = distances.get(network[0].name).?;
         for (network[1..]) |network_city| {
-            const distance = distances.getValue(network_city).?;
+            const distance = distances.get(network_city.name).?;
             if (distance < min) {
                 min = distance;
             }
@@ -197,7 +197,7 @@ pub const Grid = struct {
 
 fn loadTestGrid(allocator: *Allocator) !Grid {
     // This should only be called by tests.
-    if (!std.builtin.is_test) {
+    if (!@import("builtin").is_test) {
         unreachable;
     }
 
@@ -252,11 +252,11 @@ test "finding cities at coordinates" {
     const city2 = grid.cityAtCoords(2, 0).?;
     const nothing = grid.cityAtCoords(2, 2);
 
-    testing.expect(city1.eq(City.init("C", 0, 1)));
-    testing.expect(city2.eq(City.init("E", 2, 0)));
+    try testing.expect(city1.eq(City.init("C", 0, 1)));
+    try testing.expect(city2.eq(City.init("E", 2, 0)));
 
     if (nothing) |_| {
-        testing.expect(false);
+        try testing.expect(false);
     }
 }
 
@@ -277,17 +277,17 @@ test "calculating connections between cities" {
     const b_connections = &[_]City{ City.init("A", 0, 0), City.init("D", 1, 1), City.init("E", 2, 0) };
     const e_connections = &[_]City{City.init("B", 1, 0)};
 
-    testing.expectEqualSlices(City, e_connections, one_connection);
-    testing.expectEqualSlices(City, a_connections, two_connections);
-    testing.expectEqualSlices(City, b_connections, three_connections);
+    try testing.expectEqualSlices(City, e_connections, one_connection);
+    try testing.expectEqualSlices(City, a_connections, two_connections);
+    try testing.expectEqualSlices(City, b_connections, three_connections);
 }
 
 test "calculating connection weight" {
     const grid = try loadTestGrid(testing.allocator);
     defer grid.deinit();
 
-    testing.expectEqual(@as(u8, 5), grid.getWeight(grid.cities[0], grid.cities[1]).?);
-    testing.expectEqual(@as(u8, 3), grid.getWeight(grid.cities[1], grid.cities[3]).?);
+    try testing.expectEqual(@as(u8, 5), grid.getWeight(grid.cities[0], grid.cities[1]).?);
+    try testing.expectEqual(@as(u8, 3), grid.getWeight(grid.cities[1], grid.cities[3]).?);
 }
 
 test "calculating connection costs" {
@@ -295,20 +295,20 @@ test "calculating connection costs" {
     defer grid.deinit();
 
     // Want to start with A
-    testing.expectEqual(@as(u64, 0), try grid.getMinConnectionCost(grid.cities[0], &[_]City{}));
+    try testing.expectEqual(@as(u64, 0), try grid.getMinConnectionCost(grid.cities[0], &[_]City{}));
     // Have A, want to connect to B
-    testing.expectEqual(@as(u64, 5), try grid.getMinConnectionCost(grid.cities[1], &[_]City{
+    try testing.expectEqual(@as(u64, 5), try grid.getMinConnectionCost(grid.cities[1], &[_]City{
         grid.cities[0],
     }));
 
     // Have A and B, want to connect to C
-    testing.expectEqual(@as(u64, 5), try grid.getMinConnectionCost(grid.cities[2], &[_]City{
+    try testing.expectEqual(@as(u64, 5), try grid.getMinConnectionCost(grid.cities[2], &[_]City{
         grid.cities[0],
         grid.cities[1],
     }));
 
     // Have B and E, want to connect to C
-    testing.expectEqual(@as(u64, 7), try grid.getMinConnectionCost(grid.cities[2], &[_]City{
+    try testing.expectEqual(@as(u64, 7), try grid.getMinConnectionCost(grid.cities[2], &[_]City{
         grid.cities[1],
         grid.cities[4],
     }));

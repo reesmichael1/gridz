@@ -55,13 +55,13 @@ pub const City = struct {
     /// Will panic if called in a city with no room left.
     pub fn buildingCost(self: City, rules: Rules) u8 {
         if (self.firstPlayer == null) {
-            return Rules.first_city_cost;
+            return rules.first_city_cost;
         } else if (self.secondPlayer == null) {
-            return Rules.second_city_cost;
+            return rules.second_city_cost;
         }
 
         std.debug.assert(self.thirdPlayer == null);
-        return Rules.third_city_cost;
+        return rules.third_city_cost;
     }
 
     pub fn addPlayer(self: *City, player: Player) void {
@@ -84,28 +84,28 @@ test "building capacities in the various stages" {
     var city = City.init("Test City", 1, 2);
     const rules = Rules.init(2);
 
-    testing.expect(city.canBuild(GameStage.Stage1));
-    testing.expect(city.canBuild(GameStage.Stage2));
-    testing.expect(city.canBuild(GameStage.Stage3));
-    testing.expectEqual(Rules.first_city_cost, city.buildingCost(rules));
+    try testing.expect(city.canBuild(GameStage.Stage1));
+    try testing.expect(city.canBuild(GameStage.Stage2));
+    try testing.expect(city.canBuild(GameStage.Stage3));
+    try testing.expectEqual(rules.first_city_cost, city.buildingCost(rules));
 
     city.addPlayer(Player.init(testing.allocator, "Player 1"));
 
-    testing.expect(!city.canBuild(GameStage.Stage1));
-    testing.expect(city.canBuild(GameStage.Stage2));
-    testing.expect(city.canBuild(GameStage.Stage3));
-    testing.expectEqual(Rules.second_city_cost, city.buildingCost(rules));
+    try testing.expect(!city.canBuild(GameStage.Stage1));
+    try testing.expect(city.canBuild(GameStage.Stage2));
+    try testing.expect(city.canBuild(GameStage.Stage3));
+    try testing.expectEqual(rules.second_city_cost, city.buildingCost(rules));
 
     city.addPlayer(Player.init(testing.allocator, "Player 2"));
 
-    testing.expect(!city.canBuild(GameStage.Stage1));
-    testing.expect(!city.canBuild(GameStage.Stage2));
-    testing.expect(city.canBuild(GameStage.Stage3));
-    testing.expectEqual(Rules.third_city_cost, city.buildingCost(rules));
+    try testing.expect(!city.canBuild(GameStage.Stage1));
+    try testing.expect(!city.canBuild(GameStage.Stage2));
+    try testing.expect(city.canBuild(GameStage.Stage3));
+    try testing.expectEqual(rules.third_city_cost, city.buildingCost(rules));
 
     city.addPlayer(Player.init(testing.allocator, "Player 3"));
 
-    testing.expect(!city.canBuild(GameStage.Stage1));
-    testing.expect(!city.canBuild(GameStage.Stage2));
-    testing.expect(!city.canBuild(GameStage.Stage3));
+    try testing.expect(!city.canBuild(GameStage.Stage1));
+    try testing.expect(!city.canBuild(GameStage.Stage2));
+    try testing.expect(!city.canBuild(GameStage.Stage3));
 }

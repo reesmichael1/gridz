@@ -1,8 +1,7 @@
 const std = @import("std");
 
-pub fn getNumberFromUser(comptime T: type, comptime prompt: []const u8, args: var) !T {
-    const stdout = std.io.getStdOut().outStream();
-    const stdin = std.io.getStdIn();
+pub fn getNumberFromUser(comptime T: type, comptime prompt: []const u8, args: anytype) !T {
+    const stdout = std.io.getStdOut().writer();
 
     while (true) {
         var line_buf: [10]u8 = undefined;
@@ -21,9 +20,8 @@ pub fn getNumberFromUser(comptime T: type, comptime prompt: []const u8, args: va
     }
 }
 
-pub fn askYesOrNo(comptime prompt: []const u8, args: var) !bool {
-    const stdout = std.io.getStdOut().outStream();
-    const stdin = std.io.getStdIn();
+pub fn askYesOrNo(comptime prompt: []const u8, args: anytype) !bool {
+    const stdout = std.io.getStdOut().writer();
 
     while (true) {
         var line_buf: [10]u8 = undefined;
@@ -39,8 +37,8 @@ pub fn askYesOrNo(comptime prompt: []const u8, args: var) !bool {
     }
 }
 
-pub fn askUserForInput(comptime prompt: []const u8, args: var, buf: []u8) ![]const u8 {
-    const stdout = std.io.getStdOut().outStream();
+pub fn askUserForInput(comptime prompt: []const u8, args: anytype, buf: []u8) ![]const u8 {
+    const stdout = std.io.getStdOut().writer();
     const stdin = std.io.getStdIn();
 
     while (true) {
